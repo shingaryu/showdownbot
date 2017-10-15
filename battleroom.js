@@ -495,7 +495,7 @@ var BattleRoom = new JS.Class({
             return this.init(data);
         }
         if (data.substr(0, 9) === '|request|') {
-            return this.receiveRequest(JSON.parse(data.substr(9)));
+            return this.receiveRequest(JSON.parse(data.substr(9) || "null" ));
         }
 
         var log = data.split('\n');
