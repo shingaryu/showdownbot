@@ -19,8 +19,8 @@ var logger = require('log4js').getLogger("battleroom");
 var decisionslogger = require('log4js').getLogger("decisions");
 
 //battle-engine
-var Battle = require('./battle-engine/battle');
-var BattlePokemon = require('./battle-engine/battlepokemon');
+var Battle = require('./battle-engine/battle-engine').Battle;
+var BattlePokemon = require('./battle-engine/battle-engine').BattlePokemon;
 
 var Abilities = require("./data/abilities").BattleAbilities;
 var Items = require("./data/items").BattleItems;
