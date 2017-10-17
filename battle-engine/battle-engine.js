@@ -10,11 +10,21 @@
  * @license MIT license
  */
 
-
-// Globals
 require('sugar');
-require('./globals');
 
+// Logging for BattlePokemon
+var bpLog4js = require('log4js');
+var bpLogger = require('log4js').getLogger("battlepokemon");
+// Logging for BattleSide
+var bsLog4js = require('log4js');
+var bsLogger = require('log4js').getLogger("battleside");
+// Logging for Battle
+var battleLog4js = require('log4js');
+var battleLogger = require('log4js').getLogger("battle");
+
+// Circular, recursive clone
+var clone = require("./../clone");
+var _ = require("underscore");
 
 /**
  * Converts anything to an ID. An ID must have only lowercase alphanumeric
@@ -53,14 +63,6 @@ global.string = function (str) {
 };
 
 global.Tools = require('./../tools.js');
-
-
-
-
-
-// Logging
-var bpLog4js = require('log4js');
-var bpLogger = require('log4js').getLogger("battlepokemon");
 
 BattlePokemon = (function () {
 	function BattlePokemon(set, side) {
@@ -1182,11 +1184,6 @@ BattlePokemon = (function () {
 	return BattlePokemon;
 })();
 
-
-// Logging
-var bsLog4js = require('log4js');
-var bsLogger = require('log4js').getLogger("battleside");
-
 BattleSide = (function () {
 	function BattleSide(name, battle, n, team) {
 		var sideScripts = battle.data.Scripts.side;
@@ -1366,16 +1363,6 @@ BattleSide = (function () {
 	};
 	return BattleSide;
 })();
-
-// Circular, recursive clone
-var clone = require("./../clone");
-
-var _ = require("underscore");
-
-// Logging
-var battleLog4js = require('log4js');
-var battleLogger = require('log4js').getLogger("battle");
-
 
 // Battle Class
 Battle = (function () {
@@ -4011,7 +3998,6 @@ Battle = (function () {
 	return Battle;
 })();
 
-
-module.exports.BattlePokemon = BattlePokemon;
-module.exports.BattleSide = BattleSide
-module.exports.Battle = Battle;
+exports.BattlePokemon = BattlePokemon;
+exports.BattleSide = BattleSide
+exports.Battle = Battle;
