@@ -1,235 +1,388 @@
 /**
- * Tools
+ * Dex
  * Pokemon Showdown - http://pokemonshowdown.com/
  *
  * Handles getting data about pokemon, items, etc.
  *
- * This file is used by the main process (to validate teams)
- * as well as the individual simulator processes (to get
- * information about pokemon, items, etc to simulate).
+ * This file is used by basically every PS process. Sim processes use it
+ * to get game data for simulation, team validators use it to get data
+ * for validation, dexsearch uses it for dex data, and the main process
+ * uses it for format listing and miscellaneous dex lookup chat commands.
+ *
+ * It currently also contains our shims, since it has no dependencies and
+ * is included by nearly every process.
+ *
+ * By default, nothing is loaded until you call Dex.mod(mod) or
+ * Dex.format(format).
+ *
+ * You may choose to preload some things:
+ * - Dex.includeMods() ~10ms
+ *   This will populate Dex.dexes, giving you a list of possible mods.
+ *   Note that you don't need this for Dex.mod, Dex.mod will
+ *   automatically populate this.
+ * - Dex.includeFormats() ~30ms
+ *   As above, but will also populate Dex.formats, giving an object
+ *   containing formats.
+ * - Dex.includeData() ~500ms
+ *   As above, but will also populate all of Dex.data, giving access to
+ *   the data access functions like Dex.getTemplate, Dex.getMove, etc.
+ *   Note that you don't need this if you access the functions through
+ *   Dex.mod(...).getTemplate, because Dex.mod automatically populates
+ *   data for the relevant mod.
+ * - Dex.includeModData() ~1500ms
+ *   As above, but will also populate Dex.dexes[...].data for all mods.
+ *   Note that Dex.mod(...) will automatically populate .data, so use
+ *   this only if you need to manually iterate Dex.dexes.
+ *
+ * Note that preloading is unnecessary. The getters for Dex.data etc
+ * will automatically load this data as needed.
  *
  * @license MIT license
  */
 
-var fs = require('fs');
+'use strict';
 
-module.exports = (function () {
-	var moddedTools = {};
+const fs = require('fs');
+const path = require('path');
 
-	var dataTypes = ['FormatsData', 'Learnsets', 'Pokedex', 'Movedex', 'Statuses', 'TypeChart', 'Scripts', 'Items', 'Abilities', 'Formats', 'Aliases'];
-	var dataFiles = {
-		'Pokedex': 'pokedex.js',
-		'Movedex': 'moves.js',
-		'Statuses': 'statuses.js',
-		'TypeChart': 'typechart.js',
-		'Scripts': 'scripts.js',
-		'Items': 'items.js',
-		'Abilities': 'abilities.js',
-		'Formats': 'rulesets.js',
-		'FormatsData': 'formats-data.js',
-		'Learnsets': 'learnsets.js',
-		'Aliases': 'aliases.js'
+// shim Object.values
+if (!Object.values) {
+	Object.values = function (object) {
+		let values = [];
+		for (let k in object) values.push(object[k]);
+		return values;
 	};
-	function Tools(mod, parentMod) {
-		if (!mod) {
-			mod = 'base';
-			this.isBase = true;
-		} else if (!parentMod) {
-			parentMod = 'base';
-		}
-		this.currentMod = mod;
+	// @ts-ignore
+	Object.entries = function (object) {
+		let entries = [];
+		for (let k in object) entries.push([k, object[k]]);
+		return entries;
+	};
+}
 
-		var data = this.data = {
-			mod: mod
-		};
-		if (mod === 'base') {
-			dataTypes.forEach(function (dataType) {
-				try {
-					var path = './data/' + dataFiles[dataType];
-					if (fs.existsSync(path)) {
-						data[dataType] = require(path)['Battle' + dataType];
-					}
-				} catch (e) {
-					console.log('CRASH LOADING DATA: ' + e.stack);
-				}
-				if (!data[dataType]) data[dataType] = {};
-			}, this);
-			try {
-				var path = './config/formats.js';
-				if (fs.existsSync(path)) {
-					var configFormats = require(path).Formats;
-					for (var i = 0; i < configFormats.length; i++) {
-						var format = configFormats[i];
-						var id = toId(format.name);
-						format.effectType = 'Format';
-						if (format.challengeShow === undefined) format.challengeShow = true;
-						if (format.searchShow === undefined) format.searchShow = true;
-						data.Formats[id] = format;
-					}
-				}
-			} catch (e) {
-				console.log('CRASH LOADING FORMATS: ' + e.stack);
-			}
-		} else {
-			var parentData = moddedTools[parentMod].data;
-			dataTypes.forEach(function (dataType) {
-				try {
-					var path = './mods/' + mod + '/' + dataFiles[dataType];
-					if (fs.existsSync(path)) {
-						data[dataType] = require(path)['Battle' + dataType];
-					}
-				} catch (e) {
-					console.log('CRASH LOADING MOD DATA: ' + e.stack);
-				}
-				if (!data[dataType]) data[dataType] = {};
-				for (var i in parentData[dataType]) {
-					if (data[dataType][i] === null) {
-						// null means don't inherit
-						delete data[dataType][i];
-					} else if (!(i in data[dataType])) {
-						// If it doesn't exist it's inherited from the parent data
-						if (dataType === 'Pokedex') {
-							// Pokedex entries can be modified too many different ways
-							data[dataType][i] = Object.clone(parentData[dataType][i], true);
-						} else {
-							data[dataType][i] = parentData[dataType][i];
-						}
-					} else if (data[dataType][i] && data[dataType][i].inherit) {
-						// {inherit: true} can be used to modify only parts of the parent data,
-						// instead of overwriting entirely
-						delete data[dataType][i].inherit;
-						Object.assign(data[dataType][i], parentData[dataType][i], false, false);
-					}
-				}
-			});
-		}
-		data['Natures'] = {
-			adamant: {name:"Adamant", plus:'atk', minus:'spa'},
-			bashful: {name:"Bashful"},
-			bold: {name:"Bold", plus:'def', minus:'atk'},
-			brave: {name:"Brave", plus:'atk', minus:'spe'},
-			calm: {name:"Calm", plus:'spd', minus:'atk'},
-			careful: {name:"Careful", plus:'spd', minus:'spa'},
-			docile: {name:"Docile"},
-			gentle: {name:"Gentle", plus:'spd', minus:'def'},
-			hardy: {name:"Hardy"},
-			hasty: {name:"Hasty", plus:'spe', minus:'def'},
-			impish: {name:"Impish", plus:'def', minus:'spa'},
-			jolly: {name:"Jolly", plus:'spe', minus:'spa'},
-			lax: {name:"Lax", plus:'def', minus:'spd'},
-			lonely: {name:"Lonely", plus:'atk', minus:'def'},
-			mild: {name:"Mild", plus:'spa', minus:'def'},
-			modest: {name:"Modest", plus:'spa', minus:'atk'},
-			naive: {name:"Naive", plus:'spe', minus:'spd'},
-			naughty: {name:"Naughty", plus:'atk', minus:'spd'},
-			quiet: {name:"Quiet", plus:'spa', minus:'spe'},
-			quirky: {name:"Quirky"},
-			rash: {name:"Rash", plus:'spa', minus:'spd'},
-			relaxed: {name:"Relaxed", plus:'def', minus:'spe'},
-			sassy: {name:"Sassy", plus:'spd', minus:'spe'},
-			serious: {name:"Serious"},
-			timid: {name:"Timid", plus:'spe', minus:'atk'}
-		};
+// shim padStart
+// if (!String.prototype.padStart) {
+// 	String.prototype.padStart = function padStart(maxLength, filler) {
+// 		filler = filler || ' ';
+// 		while (filler.length + this.length < maxLength) {
+// 			filler += filler;
+// 		}
+
+// 		return filler.slice(0, maxLength - this.length) + this;
+// 	};
+// }
+
+/** @type {{[mod: string]: BattleDex}} */
+let dexes = {};
+
+/** @typedef {'Pokedex' | 'FormatsData' | 'Learnsets' | 'Movedex' | 'Statuses' | 'TypeChart' | 'Scripts' | 'Items' | 'Abilities' | 'Natures' | 'Formats' | 'Aliases'} DataType */
+const DATA_TYPES = ['Pokedex', 'FormatsData', 'Learnsets', 'Movedex', 'Statuses', 'TypeChart', 'Scripts', 'Items', 'Abilities', 'Natures', 'Formats', 'Aliases'];
+
+const DATA_FILES = {
+	'Pokedex': 'pokedex',
+	'Movedex': 'moves',
+	'Statuses': 'statuses',
+	'TypeChart': 'typechart',
+	'Scripts': 'scripts',
+	'Items': 'items',
+	'Abilities': 'abilities',
+	'Formats': 'rulesets',
+	'FormatsData': 'formats-data',
+	'Learnsets': 'learnsets',
+	'Aliases': 'aliases',
+	'Natures': 'natures',
+};
+
+/** @typedef {{
+ id: string,
+ name: string,
+}} DexTemplate */
+
+/** @typedef {{Pokedex: object, Movedex: object, Statuses: object, TypeChart: object, Scripts: object, Items: object, Abilities: object, FormatsData: object, Learnsets: object, Aliases: object, Natures: object}} BattleDexData */
+
+const BattleNatures = {
+	adamant: {name:"Adamant", plus:'atk', minus:'spa'},
+	bashful: {name:"Bashful"},
+	bold: {name:"Bold", plus:'def', minus:'atk'},
+	brave: {name:"Brave", plus:'atk', minus:'spe'},
+	calm: {name:"Calm", plus:'spd', minus:'atk'},
+	careful: {name:"Careful", plus:'spd', minus:'spa'},
+	docile: {name:"Docile"},
+	gentle: {name:"Gentle", plus:'spd', minus:'def'},
+	hardy: {name:"Hardy"},
+	hasty: {name:"Hasty", plus:'spe', minus:'def'},
+	impish: {name:"Impish", plus:'def', minus:'spa'},
+	jolly: {name:"Jolly", plus:'spe', minus:'spa'},
+	lax: {name:"Lax", plus:'def', minus:'spd'},
+	lonely: {name:"Lonely", plus:'atk', minus:'def'},
+	mild: {name:"Mild", plus:'spa', minus:'def'},
+	modest: {name:"Modest", plus:'spa', minus:'atk'},
+	naive: {name:"Naive", plus:'spe', minus:'spd'},
+	naughty: {name:"Naughty", plus:'atk', minus:'spd'},
+	quiet: {name:"Quiet", plus:'spa', minus:'spe'},
+	quirky: {name:"Quirky"},
+	rash: {name:"Rash", plus:'spa', minus:'spd'},
+	relaxed: {name:"Relaxed", plus:'def', minus:'spe'},
+	sassy: {name:"Sassy", plus:'spd', minus:'spe'},
+	serious: {name:"Serious"},
+	timid: {name:"Timid", plus:'spe', minus:'atk'},
+};
+
+function toId(text) {
+	// this is a duplicate of Dex.getId, for performance reasons
+	if (text && text.id) {
+		text = text.id;
+	} else if (text && text.userid) {
+		text = text.userid;
 	}
-	Tools.loadMods = function () {
-		if (Tools.modsLoaded) return;
-		var parentMods = {};
+	if (typeof text !== 'string' && typeof text !== 'number') return '';
+	return ('' + text).toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
 
-		try {
-			var mods = fs.readdirSync('./mods/');
+class BattleDex {
 
-			mods.forEach(function (mod) {
-				if (fs.existsSync('./mods/' + mod + '/scripts.js')) {
-					parentMods[mod] = require('./mods/' + mod + '/scripts.js').BattleScripts.inherit || 'base';
-				} else {
-					parentMods[mod] = 'base';
-				}
-			});
+	/**
+	 * @param {string=} mod
+	 */
+	constructor(mod = 'base') {
+		this.gen = 0;
 
-			var didSomething = false;
-			do {
-				didSomething = false;
-				for (var i in parentMods) {
-					if (!moddedTools[i] && moddedTools[parentMods[i]]) {
-						moddedTools[i] = Tools.construct(i, parentMods[i]);
-						didSomething = true;
-					}
-				}
-			} while (didSomething);
-		} catch (e) {
-			console.log("Error while loading mods: " + e);
-		}
-		Tools.modsLoaded = true;
-	};
+		this.name = "[BattleDex]";
 
-	Tools.prototype.mod = function (mod) {
-		Tools.loadMods();
-		if (!moddedTools[mod]) {
-			mod = this.getFormat(mod).mod;
-		}
+		this.isBase = (mod === 'base');
+		this.currentMod = mod;
+		this.parentMod = '';
+
+		/** @type {any} */
+		this.dataCache = null;
+		/** @type {any} */
+		this.formatsCache = null;
+		this.modsLoaded = false;
+
+		this.BattleDex = BattleDex;
+	}
+
+	get data() {
+		this.includeData();
+		return this.dataCache;
+	}
+	get formats() {
+		this.includeFormats();
+		return this.formatsCache;
+	}
+	get dexes() {
+		this.includeMods();
+		return dexes;
+	}
+
+	/**
+	 * @param {string} mod
+	 * @return {BattleDex}
+	 */
+	mod(mod) {
+		if (!dexes['base'].modsLoaded) dexes['base'].includeMods();
 		if (!mod) mod = 'base';
-		return moddedTools[mod];
-	};
-	Tools.prototype.modData = function (dataType, id) {
+		return dexes[mod];
+	}
+	format(format) {
+		if (!this.modsLoaded) this.includeMods();
+		const mod = this.getFormat(format).mod;
+		// TODO: change default format mod as gen7 becomes stable
+		if (!mod) return dexes['gen6'];
+		return dexes[mod];
+	}
+	/**
+	 * @param {DataType} dataType
+	 * @param {string} id
+	 */
+	modData(dataType, id) {
 		if (this.isBase) return this.data[dataType][id];
-		var parentMod = this.data.Scripts.inherit;
-		if (!parentMod) parentMod = 'base';
-		if (this.data[dataType][id] !== moddedTools[parentMod].data[dataType][id]) return this.data[dataType][id];
-		return (this.data[dataType][id] = Object.clone(this.data[dataType][id], true));
-	};
+		if (this.data[dataType][id] !== dexes[this.parentMod].data[dataType][id]) return this.data[dataType][id];
+		return (this.data[dataType][id] = this.deepClone(this.data[dataType][id]));
+	}
 
-	Tools.prototype.effectToString = function () {
+	effectToString() {
 		return this.name;
-	};
-	Tools.prototype.getImmunity = function (source, target) {
-		// returns false if the target is immune; true otherwise
-		// also checks immunity to some statuses
-		var sourceType = source.type || source;
-		var targetTyping = target.getTypes && target.getTypes() || target.types || target;
+	}
+
+	/**
+	 * Safely converts the passed variable into a string. Unlike '' + str,
+	 * String(str), or str.toString(), Tools.getString is guaranteed not to
+	 * crash.
+	 *
+	 * The other methods of casting to string can crash if str.toString crashes
+	 * or isn't a function. Instead, Tools.getString simply returns '' if the
+	 * passed variable isn't a string or a number.
+	 *
+	 * @param {any} str
+	 * @return {string}
+	 */
+	getString(str) {
+		if (typeof str === 'string' || typeof str === 'number') return '' + str;
+		return '';
+	}
+
+	/**
+	 * Sanitizes a username or Pokemon nickname
+	 *
+	 * Returns the passed name, sanitized for safe use as a name in the PS
+	 * protocol.
+	 *
+	 * Such a string must uphold these guarantees:
+	 * - must not contain any ASCII whitespace character other than a space
+	 * - must not start or end with a space character
+	 * - must not contain any of: | , [ ]
+	 * - must not be the empty string
+	 * - must not contain Unicode RTL control characters
+	 *
+	 * If no such string can be found, returns the empty string. Calling
+	 * functions are expected to check for that condition and deal with it
+	 * accordingly.
+	 *
+	 * getName also enforces that there are not multiple consecutive space
+	 * characters in the name, although this is not strictly necessary for
+	 * safety.
+	 *
+	 * @param {any} name
+	 * @return {string}
+	 */
+	getName(name) {
+		if (typeof name !== 'string' && typeof name !== 'number') return '';
+		name = ('' + name).replace(/[\|\s\[\]\,\u202e]+/g, ' ').trim();
+		if (name.length > 18) name = name.substr(0, 18).trim();
+
+		// remove zalgo
+		name = name.replace(/[\u0300-\u036f\u0483-\u0489\u0610-\u0615\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06ED\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]{3,}/g, '');
+		name = name.replace(/[\u239b-\u23b9]/g, '');
+
+		return name;
+	}
+
+	/**
+	 * Converts anything to an ID. An ID must have only lowercase alphanumeric
+	 * characters.
+	 * If a string is passed, it will be converted to lowercase and
+	 * non-alphanumeric characters will be stripped.
+	 * If an object with an ID is passed, its ID will be returned.
+	 * Otherwise, an empty string will be returned.
+	 *
+	 * Tools.getId is generally assigned to the global toId, because of how
+	 * commonly it's used.
+	 *
+	 * @param {any} text
+	 * @return {string}
+	 */
+	getId(text) {
+		if (text && text.id) {
+			text = text.id;
+		} else if (text && text.userid) {
+			text = text.userid;
+		}
+		if (typeof text !== 'string' && typeof text !== 'number') return '';
+		return ('' + text).toLowerCase().replace(/[^a-z0-9]+/g, '');
+	}
+
+	/**
+	 * returns false if the target is immune; true otherwise
+	 *
+	 * also checks immunity to some statuses
+	 */
+	getImmunity(source, target) {
+		let sourceType = source.type || source;
+		let targetTyping = target.getTypes && target.getTypes() || target.types || target;
 		if (Array.isArray(targetTyping)) {
-			for (var i = 0; i < targetTyping.length; i++) {
+			for (let i = 0; i < targetTyping.length; i++) {
 				if (!this.getImmunity(sourceType, targetTyping[i])) return false;
 			}
 			return true;
 		}
-		var typeData = this.data.TypeChart[targetTyping];
+		let typeData = this.data.TypeChart[targetTyping];
 		if (typeData && typeData.damageTaken[sourceType] === 3) return false;
 		return true;
-	};
-	Tools.prototype.getEffectiveness = function (source, target) {
-		var sourceType = source.type || source;
-		var totalTypeMod = 0;
-		var targetTyping = target.getTypes && target.getTypes() || target.types || target;
+	}
+	getEffectiveness(source, target) {
+		let sourceType = source.type || source;
+		let totalTypeMod = 0;
+		let targetTyping = target.getTypes && target.getTypes() || target.types || target;
 		if (Array.isArray(targetTyping)) {
-			for (var i = 0; i < targetTyping.length; i++) {
+			for (let i = 0; i < targetTyping.length; i++) {
 				totalTypeMod += this.getEffectiveness(sourceType, targetTyping[i]);
 			}
 			return totalTypeMod;
 		}
-		var typeData = this.data.TypeChart[targetTyping];
+		let typeData = this.data.TypeChart[targetTyping];
 		if (!typeData) return 0;
 		switch (typeData.damageTaken[sourceType]) {
-			case 1: return 1; // super-effective
-			case 2: return -1; // resist
-			// in case of weird situations like Gravity, immunity is
-			// handled elsewhere
-			default: return 0;
+		case 1: return 1; // super-effective
+		case 2: return -1; // resist
+		// in case of weird situations like Gravity, immunity is
+		// handled elsewhere
+		default: return 0;
 		}
-	};
-	Tools.prototype.getTemplate = function (template) {
+	}
+
+	/**
+	 * Convert a pokemon name, ID, or template into its species name, preserving
+	 * form name (which is the main way Tools.getSpecies(id) differs from
+	 * Tools.getTemplate(id).species).
+	 *
+	 * @param {string|DexTemplate} species
+	 * @return {string}
+	 */
+	getSpecies(species) {
+		let id = toId(species || '');
+		let template = this.getTemplate(id);
+		if (template.otherForms && template.otherForms.indexOf(id) >= 0) {
+			let form = id.slice(template.species.length);
+			species = template.species + '-' + form[0].toUpperCase() + form.slice(1);
+		} else {
+			species = template.species;
+		}
+		return species;
+	}
+
+	getTemplate(template) {
 		if (!template || typeof template === 'string') {
-			var name = (template || '').trim();
-			var id = toId(name);
-			if (this.data.Aliases[id]) {
-				name = this.data.Aliases[id];
-				id = toId(name);
+			let name = (template || '').trim();
+			let id = toId(name);
+			if (id === 'nidoran' && name.slice(-1) === '♀') {
+				id = 'nidoranf';
+			} else if (id === 'nidoran' && name.slice(-1) === '♂') {
+				id = 'nidoranm';
 			}
-			template = {};
-			if (id && this.data.Pokedex[id]) {
-				template = this.data.Pokedex[id];
-				if (template.cached) return template;
-				template.cached = true;
+			template = this.data.TemplateCache.get(id);
+			if (template) return template;
+			if (this.data.Aliases.hasOwnProperty(id)) {
+				template = this.getTemplate(this.data.Aliases[id]);
+				if (template) {
+					this.data.TemplateCache.set(id, template);
+				}
+				return template;
+			}
+			if (!this.data.Pokedex.hasOwnProperty(id)) {
+				let aliasTo = '';
+				if (id.startsWith('mega') && this.data.Pokedex[id.slice(4) + 'mega']) {
+					aliasTo = id.slice(4) + 'mega';
+				} else if (id.startsWith('m') && this.data.Pokedex[id.slice(1) + 'mega']) {
+					aliasTo = id.slice(1) + 'mega';
+				} else if (id.startsWith('primal') && this.data.Pokedex[id.slice(6) + 'primal']) {
+					aliasTo = id.slice(6) + 'primal';
+				} else if (id.startsWith('p') && this.data.Pokedex[id.slice(1) + 'primal']) {
+					aliasTo = id.slice(1) + 'primal';
+				}
+				if (aliasTo) {
+					template = this.getTemplate(aliasTo);
+					if (template.exists) {
+						this.data.TemplateCache.set(id, template);
+						return template;
+					}
+				}
+			}
+			if (id && this.data.Pokedex.hasOwnProperty(id)) {
+				template = this.deepClone(this.data.Pokedex[id]);
 				template.exists = true;
+			} else {
+				template = {};
 			}
 			name = template.species || template.name || name;
 			if (this.data.FormatsData[id]) {
@@ -249,49 +402,74 @@ module.exports = (function () {
 			if (!template.prevo) template.prevo = '';
 			if (!template.evos) template.evos = [];
 			if (!template.nfe) template.nfe = !!template.evos.length;
+			if (!template.eggGroups) template.eggGroups = [];
 			if (!template.gender) template.gender = '';
 			if (!template.genderRatio && template.gender === 'M') template.genderRatio = {M:1, F:0};
 			if (!template.genderRatio && template.gender === 'F') template.genderRatio = {M:0, F:1};
 			if (!template.genderRatio && template.gender === 'N') template.genderRatio = {M:0, F:0};
 			if (!template.genderRatio) template.genderRatio = {M:0.5, F:0.5};
 			if (!template.tier && template.baseSpecies !== template.species) template.tier = this.data.FormatsData[toId(template.baseSpecies)].tier;
+			if (!template.requiredItems && template.requiredItem) template.requiredItems = [template.requiredItem];
 			if (!template.tier) template.tier = 'Illegal';
 			if (!template.gen) {
-				if (template.forme && template.forme in {'Mega':1, 'Mega-X':1, 'Mega-Y':1}) {
+				if (template.num >= 722 || template.forme === 'Alola') {
+					template.gen = 7;
+				} else if (template.forme && template.forme in {'Mega':1, 'Mega-X':1, 'Mega-Y':1}) {
 					template.gen = 6;
 					template.isMega = true;
+					template.battleOnly = true;
 				} else if (template.forme === 'Primal') {
 					template.gen = 6;
 					template.isPrimal = true;
-				} else if (template.num >= 650) template.gen = 6;
-				else if (template.num >= 494) template.gen = 5;
-				else if (template.num >= 387) template.gen = 4;
-				else if (template.num >= 252) template.gen = 3;
-				else if (template.num >= 152) template.gen = 2;
-				else if (template.num >= 1) template.gen = 1;
-				else template.gen = 0;
+					template.battleOnly = true;
+				} else if (template.num >= 650) {
+					template.gen = 6;
+				} else if (template.num >= 494) {
+					template.gen = 5;
+				} else if (template.num >= 387) {
+					template.gen = 4;
+				} else if (template.num >= 252) {
+					template.gen = 3;
+				} else if (template.num >= 152) {
+					template.gen = 2;
+				} else if (template.num >= 1) {
+					template.gen = 1;
+				} else {
+					template.gen = 0;
+				}
 			}
+			if (template.exists) this.data.TemplateCache.set(id, template);
 		}
 		return template;
-	};
-	Tools.prototype.getMove = function (move) {
+	}
+	getLearnset(template) {
+		const id = toId(template);
+		if (!this.data.Learnsets[id]) return null;
+		return this.data.Learnsets[id].learnset;
+	}
+	getMove(move) {
 		if (!move || typeof move === 'string') {
-			var name = (move || '').trim();
-			var id = toId(name);
-			if (this.data.Aliases[id]) {
-				name = this.data.Aliases[id];
-				id = toId(name);
+			let name = (move || '').trim();
+			let id = toId(name);
+			move = this.data.MoveCache.get(id);
+			if (move) return move;
+			if (this.data.Aliases.hasOwnProperty(id)) {
+				move = this.getMove(this.data.Aliases[id]);
+				if (move.exists) {
+					this.data.MoveCache.set(id, move);
+				}
+				return move;
 			}
-			move = {};
 			if (id.substr(0, 11) === 'hiddenpower') {
-				var matches = /([a-z]*)([0-9]*)/.exec(id);
+				let matches = /([a-z]*)([0-9]*)/.exec(id);
+				// @ts-ignore
 				id = matches[1];
 			}
-			if (id && this.data.Movedex[id]) {
-				move = this.data.Movedex[id];
-				if (move.cached) return move;
-				move.cached = true;
+			if (id && this.data.Movedex.hasOwnProperty(id)) {
+				move = this.deepClone(this.data.Movedex[id]);
 				move.exists = true;
+			} else {
+				move = {};
 			}
 			if (!move.id) move.id = id;
 			if (!move.name) move.name = name;
@@ -302,18 +480,31 @@ module.exports = (function () {
 			if (!move.effectType) move.effectType = 'Move';
 			if (!move.secondaries && move.secondary) move.secondaries = [move.secondary];
 			if (!move.gen) {
-				if (move.num >= 560) move.gen = 6;
-				else if (move.num >= 468) move.gen = 5;
-				else if (move.num >= 355) move.gen = 4;
-				else if (move.num >= 252) move.gen = 3;
-				else if (move.num >= 166) move.gen = 2;
-				else if (move.num >= 1) move.gen = 1;
-				else move.gen = 0;
+				if (move.num >= 622) {
+					move.gen = 7;
+				} else if (move.num >= 560) {
+					move.gen = 6;
+				} else if (move.num >= 468) {
+					move.gen = 5;
+				} else if (move.num >= 355) {
+					move.gen = 4;
+				} else if (move.num >= 252) {
+					move.gen = 3;
+				} else if (move.num >= 166) {
+					move.gen = 2;
+				} else if (move.num >= 1) {
+					move.gen = 1;
+				} else {
+					move.gen = 0;
+				}
 			}
 			if (!move.priority) move.priority = 0;
+			if (move.ignoreImmunity === undefined) move.ignoreImmunity = (move.category === 'Status');
+			if (!move.flags) move.flags = {};
+			if (move.exists) this.data.MoveCache.set(id, move);
 		}
 		return move;
-	};
+	}
 	/**
 	 * Ensure we're working on a copy of a move (and make a copy if we aren't)
 	 *
@@ -326,17 +517,17 @@ module.exports = (function () {
 	 * @param  move    Move ID, move object, or movecopy object describing move to copy
 	 * @return         movecopy object
 	 */
-	Tools.prototype.getMoveCopy = function (move) {
+	getMoveCopy(move) {
 		if (move && move.isCopy) return move;
 		move = this.getMove(move);
-		var moveCopy = Object.clone(move, true);
+		let moveCopy = this.deepClone(move);
 		moveCopy.isCopy = true;
 		return moveCopy;
-	};
-	Tools.prototype.getEffect = function (effect) {
+	}
+	getEffect(effect) {
 		if (!effect || typeof effect === 'string') {
-			var name = (effect || '').trim();
-			var id = toId(name);
+			let name = (effect || '').trim();
+			let id = toId(name);
 			effect = {};
 			if (id && this.data.Statuses[id]) {
 				effect = this.data.Statuses[id];
@@ -353,15 +544,15 @@ module.exports = (function () {
 			} else if (id && this.data.Formats[id]) {
 				effect = this.data.Formats[id];
 				effect.name = effect.name || this.data.Formats[id].name;
-				if (!effect.mod) effect.mod = this.currentMod;
+				if (!effect.mod) effect.mod = 'gen6';
 				if (!effect.effectType) effect.effectType = 'Format';
 			} else if (id === 'recoil') {
 				effect = {
-					effectType: 'Recoil'
+					effectType: 'Recoil',
 				};
 			} else if (id === 'drain') {
 				effect = {
-					effectType: 'Drain'
+					effectType: 'Drain',
 				};
 			}
 			if (!effect.id) effect.id = id;
@@ -372,22 +563,23 @@ module.exports = (function () {
 			if (!effect.effectType) effect.effectType = 'Effect';
 		}
 		return effect;
-	};
-	Tools.prototype.getFormat = function (effect) {
+	}
+	getFormat(effect) {
 		if (!effect || typeof effect === 'string') {
-			var name = (effect || '').trim();
-			var id = toId(name);
+			let name = (effect || '').trim();
+			let id = toId(name);
 			if (this.data.Aliases[id]) {
 				name = this.data.Aliases[id];
 				id = toId(name);
 			}
 			effect = {};
-			if (id && this.data.Formats[id]) {
+			if (this.data.Formats.hasOwnProperty(id)) {
 				effect = this.data.Formats[id];
 				if (effect.cached) return effect;
 				effect.cached = true;
+				effect.exists = true;
 				effect.name = effect.name || this.data.Formats[id].name;
-				if (!effect.mod) effect.mod = this.currentMod;
+				if (!effect.mod) effect.mod = 'gen6';
 				if (!effect.effectType) effect.effectType = 'Format';
 			}
 			if (!effect.id) effect.id = id;
@@ -398,21 +590,30 @@ module.exports = (function () {
 			if (!effect.effectType) effect.effectType = 'Effect';
 		}
 		return effect;
-	};
-	Tools.prototype.getItem = function (item) {
+	}
+	getItem(item) {
 		if (!item || typeof item === 'string') {
-			var name = (item || '').trim();
-			var id = toId(name);
-			if (this.data.Aliases[id]) {
-				name = this.data.Aliases[id];
-				id = toId(name);
+			let name = (item || '').trim();
+			let id = toId(name);
+			item = this.data.ItemCache.get(id);
+			if (item) return item;
+			if (this.data.Aliases.hasOwnProperty(id)) {
+				item = this.getItem(this.data.Aliases[id]);
+				if (item.exists) {
+					this.data.ItemCache.set(id, item);
+				}
+				return item;
 			}
-			item = {};
-			if (id && this.data.Items[id]) {
+			if (id && !this.data.Items[id] && this.data.Items[id + 'berry']) {
+				item = this.getItem(id + 'berry');
+				this.data.ItemCache.set(id, item);
+				return item;
+			}
+			if (id && this.data.Items.hasOwnProperty(id)) {
 				item = this.data.Items[id];
-				if (item.cached) return item;
-				item.cached = true;
 				item.exists = true;
+			} else {
+				item = {};
 			}
 			if (!item.id) item.id = id;
 			if (!item.name) item.name = name;
@@ -421,26 +622,41 @@ module.exports = (function () {
 			if (!item.category) item.category = 'Effect';
 			if (!item.effectType) item.effectType = 'Item';
 			if (item.isBerry) item.fling = {basePower: 10};
+			if (item.id.endsWith('plate')) item.fling = {basePower: 90};
+			if (item.onDrive) item.fling = {basePower: 70};
+			if (item.megaStone) item.fling = {basePower: 80};
+			if (item.onMemory) item.fling = {basePower: 50};
 			if (!item.gen) {
-				if (item.num >= 577) item.gen = 6;
-				else if (item.num >= 537) item.gen = 5;
-				else if (item.num >= 377) item.gen = 4;
-				// Due to difference in storing items, gen 2 items must be specified specifically
-				else item.gen = 3;
+				if (item.num >= 689) {
+					item.gen = 7;
+				} else if (item.num >= 577) {
+					item.gen = 6;
+				} else if (item.num >= 537) {
+					item.gen = 5;
+				} else if (item.num >= 377) {
+					item.gen = 4;
+				} else {
+					item.gen = 3;
+				}
+				// Due to difference in storing items, gen 2 items must be specified manually
 			}
+			if (item.exists) this.data.ItemCache.set(id, item);
 		}
 		return item;
-	};
-	Tools.prototype.getAbility = function (ability) {
+	}
+	getAbility(ability) {
 		if (!ability || typeof ability === 'string') {
-			var name = (ability || '').trim();
-			var id = toId(name);
-			ability = {};
-			if (id && this.data.Abilities[id]) {
+			let name = (ability || '').trim();
+			let id = toId(name);
+			ability = this.data.AbilityCache.get(id);
+			if (ability) return ability;
+			if (id && this.data.Abilities.hasOwnProperty(id)) {
 				ability = this.data.Abilities[id];
 				if (ability.cached) return ability;
 				ability.cached = true;
 				ability.exists = true;
+			} else {
+				ability = {};
 			}
 			if (!ability.id) ability.id = id;
 			if (!ability.name) ability.name = name;
@@ -449,21 +665,30 @@ module.exports = (function () {
 			if (!ability.category) ability.category = 'Effect';
 			if (!ability.effectType) ability.effectType = 'Ability';
 			if (!ability.gen) {
-				if (ability.num >= 165) ability.gen = 6;
-				else if (ability.num >= 124) ability.gen = 5;
-				else if (ability.num >= 77) ability.gen = 4;
-				else if (ability.num >= 1) ability.gen = 3;
-				else ability.gen = 0;
+				if (ability.num >= 192) {
+					ability.gen = 7;
+				} else if (ability.num >= 165) {
+					ability.gen = 6;
+				} else if (ability.num >= 124) {
+					ability.gen = 5;
+				} else if (ability.num >= 77) {
+					ability.gen = 4;
+				} else if (ability.num >= 1) {
+					ability.gen = 3;
+				} else {
+					ability.gen = 0;
+				}
 			}
+			if (ability.exists) this.data.AbilityCache.set(id, ability);
 		}
 		return ability;
-	};
-	Tools.prototype.getType = function (type) {
+	}
+	getType(type) {
 		if (!type || typeof type === 'string') {
-			var id = toId(type);
-			id = id.substr(0, 1).toUpperCase() + id.substr(1);
+			let id = toId(type);
+			id = id.charAt(0).toUpperCase() + id.substr(1);
 			type = {};
-			if (id && this.data.TypeChart[id]) {
+			if (id && id !== 'constructor' && this.data.TypeChart[id]) {
 				type = this.data.TypeChart[id];
 				if (type.cached) return type;
 				type.cached = true;
@@ -478,13 +703,13 @@ module.exports = (function () {
 			}
 		}
 		return type;
-	};
-	Tools.prototype.getNature = function (nature) {
+	}
+	getNature(nature) {
 		if (!nature || typeof nature === 'string') {
-			var name = (nature || '').trim();
-			var id = toId(name);
+			let name = (nature || '').trim();
+			let id = toId(name);
 			nature = {};
-			if (id && this.data.Natures[id]) {
+			if (id && id !== 'constructor' && this.data.Natures[id]) {
 				nature = this.data.Natures[id];
 				if (nature.cached) return nature;
 				nature.cached = true;
@@ -496,16 +721,58 @@ module.exports = (function () {
 			if (!nature.effectType) nature.effectType = 'Nature';
 		}
 		return nature;
-	};
-	Tools.prototype.natureModify = function (stats, nature) {
+	}
+	spreadModify(stats, set) {
+		const modStats = {atk:10, def:10, spa:10, spd:10, spe:10};
+		for (let statName in modStats) {
+			let stat = stats[statName];
+			modStats[statName] = Math.floor(Math.floor(2 * stat + set.ivs[statName] + Math.floor(set.evs[statName] / 4)) * set.level / 100 + 5);
+		}
+		if ('hp' in stats) {
+			let stat = stats['hp'];
+			modStats['hp'] = Math.floor(Math.floor(2 * stat + set.ivs['hp'] + Math.floor(set.evs['hp'] / 4) + 100) * set.level / 100 + 10);
+		}
+		return this.natureModify(modStats, set.nature);
+	}
+	natureModify(stats, nature) {
 		nature = this.getNature(nature);
-		if (nature.plus) stats[nature.plus] *= 1.1;
-		if (nature.minus) stats[nature.minus] *= 0.9;
+		if (nature.plus) stats[nature.plus] = Math.floor(stats[nature.plus] * 1.1);
+		if (nature.minus) stats[nature.minus] = Math.floor(stats[nature.minus] * 0.9);
 		return stats;
-	};
+	}
 
-	Tools.prototype.getBanlistTable = function (format, subformat, depth) {
-		var banlistTable;
+	getHiddenPower(ivs) {
+		const hpTypes = ['Fighting', 'Flying', 'Poison', 'Ground', 'Rock', 'Bug', 'Ghost', 'Steel', 'Fire', 'Water', 'Grass', 'Electric', 'Psychic', 'Ice', 'Dragon', 'Dark'];
+		const stats = {hp: 31, atk: 31, def: 31, spe: 31, spa: 31, spd: 31};
+		if (this.gen <= 2) {
+			// Gen 2 specific Hidden Power check. IVs are still treated 0-31 so we get them 0-15
+			const atkDV = Math.floor(ivs.atk / 2);
+			const defDV = Math.floor(ivs.def / 2);
+			const speDV = Math.floor(ivs.spe / 2);
+			const spcDV = Math.floor(ivs.spa / 2);
+			return {
+				type: hpTypes[4 * (atkDV % 4) + (defDV % 4)],
+				power: Math.floor((5 * ((spcDV >> 3) + (2 * (speDV >> 3)) + (4 * (defDV >> 3)) + (8 * (atkDV >> 3))) + (spcDV > 2 ? 3 : spcDV)) / 2 + 31),
+			};
+		} else {
+			// Hidden Power check for gen 3 onwards
+			let hpTypeX = 0, hpPowerX = 0;
+			let i = 1;
+			for (const s in stats) {
+				hpTypeX += i * (ivs[s] % 2);
+				hpPowerX += i * (Math.floor(ivs[s] / 2) % 2);
+				i *= 2;
+			}
+			return {
+				type: hpTypes[Math.floor(hpTypeX * 15 / 63)],
+				// In Gen 6, Hidden Power is always 60 base power
+				power: (this.gen && this.gen < 6) ? Math.floor(hpPowerX * 40 / 63) + 30 : 60,
+			};
+		}
+	}
+
+	getBanlistTable(format, subformat, depth) {
+		let banlistTable;
 		if (!depth) depth = 0;
 		if (depth > 8) return; // avoid infinite recursion
 		if (format.banlistTable && !subformat) {
@@ -514,46 +781,61 @@ module.exports = (function () {
 			if (!format.banlistTable) format.banlistTable = {};
 			if (!format.setBanTable) format.setBanTable = [];
 			if (!format.teamBanTable) format.teamBanTable = [];
+			if (!format.teamLimitTable) format.teamLimitTable = [];
 
 			banlistTable = format.banlistTable;
 			if (!subformat) subformat = format;
+			if (subformat.unbanlist) {
+				for (let i = 0; i < subformat.unbanlist.length; i++) {
+					banlistTable[subformat.unbanlist[i]] = false;
+					banlistTable[toId(subformat.unbanlist[i])] = false;
+				}
+			}
 			if (subformat.banlist) {
-				for (var i = 0; i < subformat.banlist.length; i++) {
+				for (let i = 0; i < subformat.banlist.length; i++) {
 					// don't revalidate what we already validate
-					if (banlistTable[toId(subformat.banlist[i])]) continue;
+					if (banlistTable[toId(subformat.banlist[i])] !== undefined) continue;
 
 					banlistTable[subformat.banlist[i]] = subformat.name || true;
 					banlistTable[toId(subformat.banlist[i])] = subformat.name || true;
 
-					var plusPos = subformat.banlist[i].indexOf('+');
-					var complexList;
-					if (plusPos && plusPos > 0) {
-						var plusPlusPos = subformat.banlist[i].indexOf('++');
-						if (plusPlusPos && plusPlusPos > 0) {
+					let complexList;
+					if (subformat.banlist[i].includes('>')) {
+						complexList = subformat.banlist[i].split('>');
+						let limit = parseInt(complexList[1]);
+						let banlist = complexList[0].trim();
+						complexList = banlist.split('+').map(toId);
+						complexList.unshift(banlist, subformat.name, limit);
+						format.teamLimitTable.push(complexList);
+					} else if (subformat.banlist[i].includes('+')) {
+						if (subformat.banlist[i].includes('++')) {
 							complexList = subformat.banlist[i].split('++');
-							for (var j = 0; j < complexList.length; j++) {
+							let banlist = complexList.join('+');
+							for (let j = 0; j < complexList.length; j++) {
 								complexList[j] = toId(complexList[j]);
 							}
+							complexList.unshift(banlist);
 							format.teamBanTable.push(complexList);
 						} else {
 							complexList = subformat.banlist[i].split('+');
-							for (var j = 0; j < complexList.length; j++) {
+							for (let j = 0; j < complexList.length; j++) {
 								complexList[j] = toId(complexList[j]);
 							}
+							complexList.unshift(subformat.banlist[i]);
 							format.setBanTable.push(complexList);
 						}
 					}
 				}
 			}
 			if (subformat.ruleset) {
-				for (var i = 0; i < subformat.ruleset.length; i++) {
+				for (let i = 0; i < subformat.ruleset.length; i++) {
 					// don't revalidate what we already validate
-					if (banlistTable['Rule:' + toId(subformat.ruleset[i])]) continue;
+					if (banlistTable['Rule:' + toId(subformat.ruleset[i])] !== undefined) continue;
 
 					banlistTable['Rule:' + toId(subformat.ruleset[i])] = subformat.ruleset[i];
-					if (format.ruleset.indexOf(subformat.ruleset[i]) === -1) format.ruleset.push(subformat.ruleset[i]);
+					if (!format.ruleset.includes(subformat.ruleset[i])) format.ruleset.push(subformat.ruleset[i]);
 
-					var subsubformat = this.getFormat(subformat.ruleset[i]);
+					let subsubformat = this.getFormat(subformat.ruleset[i]);
 					if (subsubformat.ruleset || subsubformat.banlist) {
 						this.getBanlistTable(format, subsubformat, depth + 1);
 					}
@@ -561,43 +843,60 @@ module.exports = (function () {
 			}
 		}
 		return banlistTable;
-	};
+	}
 
-	Tools.prototype.levenshtein = function (s, t, l) { // s = string 1, t = string 2, l = limit
+	shuffle(arr) {
+		// In-place shuffle by Fisher-Yates algorithm
+		for (let i = arr.length - 1; i > 0; i--) {
+			let j = Math.floor(Math.random() * (i + 1));
+			let temp = arr[i];
+			arr[i] = arr[j];
+			arr[j] = temp;
+		}
+		return arr;
+	}
+
+	/**
+	 * @param {string} s - string 1
+	 * @param {string} t - string 2
+	 * @param {number} l - limit
+	 */
+	levenshtein(s, t, l) {
 		// Original levenshtein distance function by James Westgate, turned out to be the fastest
-		var d = []; // 2d matrix
+		/** @type {number[][]} */
+		let d = [];
 
 		// Step 1
-		var n = s.length;
-		var m = t.length;
+		let n = s.length;
+		let m = t.length;
 
 		if (n === 0) return m;
 		if (m === 0) return n;
 		if (l && Math.abs(m - n) > l) return Math.abs(m - n);
 
 		// Create an array of arrays in javascript (a descending loop is quicker)
-		for (var i = n; i >= 0; i--) d[i] = [];
+		for (let i = n; i >= 0; i--) d[i] = [];
 
 		// Step 2
-		for (var i = n; i >= 0; i--) d[i][0] = i;
-		for (var j = m; j >= 0; j--) d[0][j] = j;
+		for (let i = n; i >= 0; i--) d[i][0] = i;
+		for (let j = m; j >= 0; j--) d[0][j] = j;
 
 		// Step 3
-		for (var i = 1; i <= n; i++) {
-			var s_i = s.charAt(i - 1);
+		for (let i = 1; i <= n; i++) {
+			let s_i = s.charAt(i - 1);
 
 			// Step 4
-			for (var j = 1; j <= m; j++) {
+			for (let j = 1; j <= m; j++) {
 				// Check the jagged ld total so far
 				if (i === j && d[i][j] > 4) return n;
 
-				var t_j = t.charAt(j - 1);
-				var cost = (s_i === t_j) ? 0 : 1; // Step 5
+				let t_j = t.charAt(j - 1);
+				let cost = (s_i === t_j) ? 0 : 1; // Step 5
 
 				// Calculate the minimum
-				var mi = d[i - 1][j] + 1;
-				var b = d[i][j - 1] + 1;
-				var c = d[i - 1][j - 1] + cost;
+				let mi = d[i - 1][j] + 1;
+				let b = d[i][j - 1] + 1;
+				let c = d[i - 1][j - 1] + cost;
 
 				if (b < mi) mi = b;
 				if (c < mi) mi = c;
@@ -608,44 +907,43 @@ module.exports = (function () {
 
 		// Step 7
 		return d[n][m];
-	};
+	}
 
-	Tools.prototype.clampIntRange = function (num, min, max) {
+	clampIntRange(num, min, max) {
 		if (typeof num !== 'number') num = 0;
 		num = Math.floor(num);
 		if (num < min) num = min;
 		if (max !== undefined && num > max) num = max;
 		return num;
-	};
+	}
 
-	Tools.prototype.escapeHTML = function (str) {
-		if (!str) return '';
-		return ('' + str).escapeHTML();
-	};
-
-	Tools.prototype.dataSearch = function (target, searchIn) {
+	dataSearch(target, searchIn, isInexact) {
 		if (!target) {
 			return false;
 		}
 
 		searchIn = searchIn || ['Pokedex', 'Movedex', 'Abilities', 'Items', 'Natures'];
 
-		var searchFunctions = {Pokedex: 'getTemplate', Movedex: 'getMove', Abilities: 'getAbility', Items: 'getItem', Natures: 'getNature'};
-		var searchTypes = {Pokedex: 'pokemon', Movedex: 'move', Abilities: 'ability', Items: 'item', Natures: 'nature'};
-		var searchResults = [];
-		for (var i = 0; i < searchIn.length; i++) {
-			var res = this[searchFunctions[searchIn[i]]](target);
+		let searchFunctions = {Pokedex: 'getTemplate', Movedex: 'getMove', Abilities: 'getAbility', Items: 'getItem', Natures: 'getNature'};
+		let searchTypes = {Pokedex: 'pokemon', Movedex: 'move', Abilities: 'ability', Items: 'item', Natures: 'nature'};
+		let searchResults = [];
+		for (let i = 0; i < searchIn.length; i++) {
+			let res = this[searchFunctions[searchIn[i]]](target);
 			if (res.exists) {
-				res.searchType = searchTypes[searchIn[i]];
-				searchResults.push(res);
+				searchResults.push({
+					exactMatch: !isInexact,
+					searchType: searchTypes[searchIn[i]],
+					name: res.name,
+				});
 			}
 		}
 		if (searchResults.length) {
 			return searchResults;
 		}
 
-		var cmpTarget = target.toLowerCase();
-		var maxLd = 3;
+		let cmpTarget = target.toLowerCase();
+		let maxLd = 3;
+		let fuzzyResults = [];
 		if (cmpTarget.length <= 1) {
 			return false;
 		} else if (cmpTarget.length <= 4) {
@@ -653,14 +951,14 @@ module.exports = (function () {
 		} else if (cmpTarget.length <= 6) {
 			maxLd = 2;
 		}
-		for (var i = 0; i < searchIn.length; i++) {
-			var searchObj = this.data[searchIn[i]];
+		for (let i = 0; i < searchIn.length; i++) {
+			let searchObj = this.data[searchIn[i]];
 			if (!searchObj) {
 				continue;
 			}
 
-			for (var j in searchObj) {
-				var word = searchObj[j];
+			for (let j in searchObj) {
+				let word = searchObj[j];
 				if (typeof word === "object") {
 					word = word.name || word.species;
 				}
@@ -668,54 +966,55 @@ module.exports = (function () {
 					continue;
 				}
 
-				var ld = this.levenshtein(cmpTarget, word.toLowerCase(), maxLd);
+				let ld = this.levenshtein(cmpTarget, word.toLowerCase(), maxLd);
 				if (ld <= maxLd) {
-					searchResults.push({word: word, ld: ld});
+					fuzzyResults.push({word: word, ld: ld});
 				}
 			}
 		}
 
-		if (searchResults.length) {
-			var newTarget = "";
-			var newLD = 10;
-			for (var i = 0, l = searchResults.length; i < l; i++) {
-				if (searchResults[i].ld < newLD) {
-					newTarget = searchResults[i];
-					newLD = searchResults[i].ld;
+		if (fuzzyResults.length) {
+			/** @type {any} */
+			let newTarget = "";
+			let newLD = 10;
+			for (let i = 0, l = fuzzyResults.length; i < l; i++) {
+				if (fuzzyResults[i].ld < newLD) {
+					newTarget = fuzzyResults[i];
+					newLD = fuzzyResults[i].ld;
 				}
 			}
 
 			// To make sure we aren't in an infinite loop...
 			if (cmpTarget !== newTarget.word) {
-				return this.dataSearch(newTarget.word);
+				return this.dataSearch(newTarget.word, null, true);
 			}
 		}
 
 		return false;
-	};
+	}
 
-	Tools.prototype.packTeam = function (team) {
+	packTeam(team) {
 		if (!team) return '';
 
-		var buf = '';
+		let buf = '';
 
-		for (var i = 0; i < team.length; i++) {
-			var set = team[i];
+		for (let i = 0; i < team.length; i++) {
+			let set = team[i];
 			if (buf) buf += ']';
 
 			// name
 			buf += (set.name || set.species);
 
 			// species
-			var id = toId(set.species || set.name);
+			let id = toId(set.species || set.name);
 			buf += '|' + (toId(set.name || set.species) === id ? '' : id);
 
 			// item
 			buf += '|' + toId(set.item);
 
 			// ability
-			var template = moddedTools.base.getTemplate(set.species || set.name);
-			var abilities = template.abilities;
+			let template = dexes['base'].getTemplate(set.species || set.name);
+			let abilities = template.abilities;
 			id = toId(set.ability);
 			if (abilities) {
 				if (id === toId(abilities['0'])) {
@@ -738,7 +1037,7 @@ module.exports = (function () {
 			buf += '|' + set.nature;
 
 			// evs
-			var evs = '|';
+			let evs = '|';
 			if (set.evs) {
 				evs = '|' + (set.evs['hp'] || '') + ',' + (set.evs['atk'] || '') + ',' + (set.evs['def'] || '') + ',' + (set.evs['spa'] || '') + ',' + (set.evs['spd'] || '') + ',' + (set.evs['spe'] || '');
 			}
@@ -756,7 +1055,7 @@ module.exports = (function () {
 			}
 
 			// ivs
-			var ivs = '|';
+			let ivs = '|';
 			if (set.ivs) {
 				ivs = '|' + (set.ivs['hp'] === 31 || set.ivs['hp'] === undefined ? '' : set.ivs['hp']) + ',' + (set.ivs['atk'] === 31 || set.ivs['atk'] === undefined ? '' : set.ivs['atk']) + ',' + (set.ivs['def'] === 31 || set.ivs['def'] === undefined ? '' : set.ivs['def']) + ',' + (set.ivs['spa'] === 31 || set.ivs['spa'] === undefined ? '' : set.ivs['spa']) + ',' + (set.ivs['spd'] === 31 || set.ivs['spd'] === undefined ? '' : set.ivs['spd']) + ',' + (set.ivs['spe'] === 31 || set.ivs['spe'] === undefined ? '' : set.ivs['spe']);
 			}
@@ -786,20 +1085,25 @@ module.exports = (function () {
 			} else {
 				buf += '|';
 			}
+
+			if (set.pokeball || set.hpType) {
+				buf += ',' + set.hpType;
+				buf += ',' + toId(set.pokeball);
+			}
 		}
 
 		return buf;
-	};
+	}
 
-	Tools.prototype.fastUnpackTeam = function (buf) {
+	fastUnpackTeam(buf) {
 		if (!buf) return null;
 
-		var team = [];
-		var i = 0, j = 0;
+		let team = [];
+		let i = 0, j = 0;
 
 		// limit to 24
-		for (var count = 0; count < 24; count++) {
-			var set = {};
+		for (let count = 0; count < 24; count++) {
+			let set = {};
 			team.push(set);
 
 			// name
@@ -823,15 +1127,15 @@ module.exports = (function () {
 			// ability
 			j = buf.indexOf('|', i);
 			if (j < 0) return;
-			var ability = buf.substring(i, j);
-			var template = moddedTools.base.getTemplate(set.species);
+			let ability = buf.substring(i, j);
+			let template = dexes['base'].getTemplate(set.species);
 			set.ability = (template.abilities && ability in {'':1, 0:1, 1:1, H:1} ? template.abilities[ability || '0'] : ability);
 			i = j + 1;
 
 			// moves
 			j = buf.indexOf('|', i);
 			if (j < 0) return;
-			set.moves = buf.substring(i, j).split(',');
+			set.moves = buf.substring(i, j).split(',', 24);
 			i = j + 1;
 
 			// nature
@@ -844,14 +1148,14 @@ module.exports = (function () {
 			j = buf.indexOf('|', i);
 			if (j < 0) return;
 			if (j !== i) {
-				var evs = buf.substring(i, j).split(',');
+				let evs = buf.substring(i, j).split(',', 6);
 				set.evs = {
 					hp: Number(evs[0]) || 0,
 					atk: Number(evs[1]) || 0,
 					def: Number(evs[2]) || 0,
 					spa: Number(evs[3]) || 0,
 					spd: Number(evs[4]) || 0,
-					spe: Number(evs[5]) || 0
+					spe: Number(evs[5]) || 0,
 				};
 			}
 			i = j + 1;
@@ -866,14 +1170,14 @@ module.exports = (function () {
 			j = buf.indexOf('|', i);
 			if (j < 0) return;
 			if (j !== i) {
-				var ivs = buf.substring(i, j).split(',');
+				let ivs = buf.substring(i, j).split(',', 6);
 				set.ivs = {
 					hp: ivs[0] === '' ? 31 : Number(ivs[0]) || 0,
 					atk: ivs[1] === '' ? 31 : Number(ivs[1]) || 0,
 					def: ivs[2] === '' ? 31 : Number(ivs[2]) || 0,
 					spa: ivs[3] === '' ? 31 : Number(ivs[3]) || 0,
 					spd: ivs[4] === '' ? 31 : Number(ivs[4]) || 0,
-					spe: ivs[5] === '' ? 31 : Number(ivs[5]) || 0
+					spe: ivs[5] === '' ? 31 : Number(ivs[5]) || 0,
 				};
 			}
 			i = j + 1;
@@ -887,55 +1191,212 @@ module.exports = (function () {
 			// level
 			j = buf.indexOf('|', i);
 			if (j < 0) return;
-			if (i !== j) set.level = parseInt(buf.substring(i, j), 10);
+			if (i !== j) set.level = parseInt(buf.substring(i, j));
 			i = j + 1;
 
 			// happiness
 			j = buf.indexOf(']', i);
+			let misc;
 			if (j < 0) {
-				if (buf.substring(i)) {
-					set.happiness = Number(buf.substring(i));
-				}
-				break;
+				if (i < buf.length) misc = buf.substring(i).split(',', 3);
+			} else {
+				if (i !== j) misc = buf.substring(i, j).split(',', 3);
 			}
-			if (i !== j) set.happiness = Number(buf.substring(i, j));
+			if (misc) {
+				set.happiness = (misc[0] ? Number(misc[0]) : 255);
+				set.hpType = misc[1];
+				set.pokeball = misc[2];
+			}
+			if (j < 0) break;
 			i = j + 1;
 		}
 
 		return team;
-	};
+	}
+
+	deepClone(obj) {
+		if (typeof obj === 'function') return obj;
+		if (obj === null || typeof obj !== 'object') return obj;
+		if (Array.isArray(obj)) return obj.map(prop => this.deepClone(prop));
+		const clone = Object.create(Object.getPrototypeOf(obj));
+		const keys = Object.keys(obj);
+		for (let i = 0; i < keys.length; i++) {
+			clone[keys[i]] = this.deepClone(obj[keys[i]]);
+		}
+		return clone;
+	}
+
+	loadDataFile(basePath, dataType) {
+		try {
+			const filePath = basePath + DATA_FILES[dataType];
+			const dataObject = require(filePath);
+			const key = `Battle${dataType}`;
+			if (!dataObject || typeof dataObject !== 'object') return new TypeError(`${filePath}, if it exists, must export a non-null object`);
+			if (!dataObject[key] || typeof dataObject[key] !== 'object') return new TypeError(`${filePath}, if it exists, must export an object whose '${key}' property is a non-null object`);
+			return dataObject[key];
+		} catch (e) {
+			if (e.code !== 'MODULE_NOT_FOUND') {
+				throw e;
+			}
+		}
+		return {};
+	}
+
+	includeMods() {
+		if (!this.isBase) throw new Error(`This must be called on the base Dex`);
+		if (this.modsLoaded) return this;
+
+		let modList = fs.readdirSync(path.resolve(__dirname, 'mods'));
+		for (let i = 0; i < modList.length; i++) {
+			dexes[modList[i]] = new BattleDex(modList[i]);
+		}
+		this.modsLoaded = true;
+
+		return this;
+	}
+
+	includeModData() {
+		for (const mod in this.dexes) {
+			dexes[mod].includeData();
+		}
+	}
+
+	includeData() {
+		if (this.dataCache) return this;
+		dexes['base'].includeMods();
+		this.dataCache = {};
+
+		let basePath = this.isBase ? './data/' : './mods/' + this.currentMod + '/';
+
+		let BattleScripts = this.loadDataFile(basePath, 'Scripts');
+		this.parentMod = this.isBase ? '' : (BattleScripts.inherit || 'base');
+
+		let parentDex;
+		if (this.parentMod) {
+			parentDex = dexes[this.parentMod];
+			if (!parentDex || parentDex === this) throw new Error("Unable to load " + this.currentMod + ". `inherit` should specify a parent mod from which to inherit data, or must be not specified.");
+		}
+
+		for (let dataType of DATA_TYPES) {
+			if (dataType === 'Natures' && this.isBase) {
+				this.dataCache[dataType] = BattleNatures;
+				continue;
+			}
+			let BattleData = this.loadDataFile(basePath, dataType);
+			if (!BattleData || typeof BattleData !== 'object') throw new TypeError("Exported property `Battle" + dataType + "`from `" + './data/' + DATA_FILES[dataType] + "` must be an object except `null`.");
+			if (BattleData !== this.dataCache[dataType]) this.dataCache[dataType] = Object.assign(BattleData, this.dataCache[dataType]);
+			if (dataType === 'Formats' && !parentDex) Object.assign(BattleData, this.formats);
+		}
+		this.dataCache['MoveCache'] = new Map();
+		this.dataCache['ItemCache'] = new Map();
+		this.dataCache['AbilityCache'] = new Map();
+		this.dataCache['TemplateCache'] = new Map();
+		if (!parentDex) {
+			// Formats are inherited by mods
+			this.includeFormats();
+		} else {
+			for (let dataType of DATA_TYPES) {
+				const parentTypedData = parentDex.data[dataType];
+				const childTypedData = this.dataCache[dataType] || (this.dataCache[dataType] = {});
+				for (let entryId in parentTypedData) {
+					if (childTypedData[entryId] === null) {
+						// null means don't inherit
+						delete childTypedData[entryId];
+					} else if (!(entryId in childTypedData)) {
+						// If it doesn't exist it's inherited from the parent data
+						if (dataType === 'Pokedex') {
+							// Pokedex entries can be modified too many different ways
+							// e.g. inheriting different formats-data/learnsets
+							childTypedData[entryId] = this.deepClone(parentTypedData[entryId]);
+						} else {
+							childTypedData[entryId] = parentTypedData[entryId];
+						}
+					} else if (childTypedData[entryId] && childTypedData[entryId].inherit) {
+						// {inherit: true} can be used to modify only parts of the parent data,
+						// instead of overwriting entirely
+						delete childTypedData[entryId].inherit;
+
+						// Merge parent into children entry, preserving existing childs' properties.
+						for (let key in parentTypedData[entryId]) {
+							if (key in childTypedData[entryId]) continue;
+							childTypedData[entryId][key] = parentTypedData[entryId][key];
+						}
+					}
+				}
+			}
+		}
+
+		// Flag the generation. Required for team validator.
+		this.gen = this.dataCache.Scripts.gen || 7;
+
+		// Execute initialization script.
+		if (BattleScripts.init) BattleScripts.init.call(this);
+
+		return this;
+	}
+
+	includeFormats() {
+		if (!this.isBase) throw new Error(`This should only be run on the base mod`);
+		this.includeMods();
+		if (this.formatsCache) return this;
+
+		if (!this.formatsCache) this.formatsCache = {};
+
+		// Load formats
+		let Formats;
+		try {
+			Formats = require('./config/formats').Formats;
+		} catch (e) {
+			if (e.code !== 'MODULE_NOT_FOUND') throw e;
+		}
+		if (!Array.isArray(Formats)) throw new TypeError(`Exported property 'Formats' from "./config/formats.js" must be an array`);
+
+		let section = '';
+		let column = 1;
+		for (let i = 0; i < Formats.length; i++) {
+			let format = Formats[i];
+			let id = toId(format.name);
+			if (format.section) section = format.section;
+			if (format.column) column = format.column;
+			if (!format.name && format.section) continue;
+			if (!id) throw new RangeError(`Format #${i + 1} must have a name with alphanumeric characters, not '${format.name}'`);
+			if (!format.section) format.section = section;
+			if (!format.column) format.column = column;
+			if (this.formatsCache[id]) throw new Error(`Format #${i + 1} has a duplicate ID: '${id}'`);
+			format.effectType = 'Format';
+			if (format.challengeShow === undefined) format.challengeShow = true;
+			if (format.searchShow === undefined) format.searchShow = true;
+			if (format.tournamentShow === undefined) format.tournamentShow = true;
+			if (format.mod === undefined) format.mod = 'gen6';
+			if (!dexes[format.mod]) throw new Error(`Format "${format.name}" requires nonexistent mod: '${format.mod}'`);
+			this.formatsCache[id] = format;
+		}
+
+		return this;
+	}
+
+	installFormat(id, format) {
+		dexes['base'].includeFormats();
+		dexes['base'].formatsCache[id] = format;
+		if (this.dataCache) this.dataCache.Formats[id] = format;
+		if (!this.isBase) {
+			if (dexes['base'].dataCache) dexes['base'].dataCache.Formats[id] = format;
+		}
+	}
 
 	/**
 	 * Install our Tools functions into the battle object
 	 */
-	Tools.prototype.install = function (battle) {
-		for (var i in this.data.Scripts) {
+	install(battle) {
+		for (let i in this.data.Scripts) {
 			battle[i] = this.data.Scripts[i];
 		}
-	};
+	}
+}
 
-	Tools.construct = function (mod, parentMod) {
-		var tools = new Tools(mod, parentMod);
-		// Scripts override Tools.
-		var ret = Object.create(tools);
-		tools.install(ret);
-		if (ret.init) {
-			if (parentMod && ret.init === moddedTools[parentMod].data.Scripts.init) {
-				// don't inherit init
-				delete ret.init;
-			} else {
-				ret.init();
-			}
-		}
-		return ret;
-	};
+dexes['base'] = new BattleDex();
 
-	moddedTools.base = Tools.construct();
+// "gen7" is an alias for the current base data
+dexes['gen7'] = dexes['base'];
 
-	// "gen6" is an alias for the current base data
-	moddedTools.gen6 = moddedTools.base;
-
-	Object.getPrototypeOf(moddedTools.base).moddedTools = moddedTools;
-
-	return moddedTools.base;
-})();
+module.exports = dexes['gen7'];
