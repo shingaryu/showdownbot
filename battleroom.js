@@ -38,7 +38,7 @@ var BattleRoom = new JS.Class({
         this.send = sendfunc;
 
         // Construct a battle object that we will modify as our state
-        this.state = Battle.construct(id, 'base', false);
+        this.state = require('./battle-engine/battle-engine').construct('base', false, null);
         this.state.join('p1', 'botPlayer'); // We will be player 1 in our local simulation
         this.state.join('p2', 'humanPlayer');
         this.state.reportPercentages = true;

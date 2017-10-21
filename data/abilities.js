@@ -506,7 +506,7 @@ exports.BattleAbilities = {
 	},
 	"corrosion": {
 		shortDesc: "This Pokemon can poison or badly poison other Pokemon regardless of their typing.",
-		// Implemented in sim/pokemon.js:Pokemon#setStatus
+		// Implemented in battle-engine.js:BattlePokemon#setStatus
 		id: "corrosion",
 		name: "Corrosion",
 		rating: 2.5,
@@ -1450,11 +1450,8 @@ exports.BattleAbilities = {
 			if (pokemon === pokemon.side.pokemon[i]) return;
 			pokemon.illusion = pokemon.side.pokemon[i];
 		},
-		onAfterDamage: function (damage, target, source, effect) {
-			if (target.illusion && effect && effect.effectType === 'Move' && effect.id !== 'confused') {
-				this.singleEvent('End', this.getAbility('Illusion'), target.abilityData, target, source, effect);
-			}
-		},
+		// illusion clearing for damage is hardcoded in the damage
+		// function because mold breaker inhibits the damage event
 		onEnd: function (pokemon) {
 			if (pokemon.illusion) {
 				this.debug('illusion cleared');
@@ -1467,7 +1464,6 @@ exports.BattleAbilities = {
 		onFaint: function (pokemon) {
 			pokemon.illusion = null;
 		},
-		isUnbreakable: true,
 		id: "illusion",
 		name: "Illusion",
 		rating: 4,
@@ -1645,7 +1641,7 @@ exports.BattleAbilities = {
 	"klutz": {
 		desc: "This Pokemon's held item has no effect. This Pokemon cannot use Fling successfully. Macho Brace, Power Anklet, Power Band, Power Belt, Power Bracer, Power Lens, and Power Weight still have their effects.",
 		shortDesc: "This Pokemon's held item has no effect, except Macho Brace. Fling cannot be used.",
-		// Item suppression implemented in Pokemon.ignoringItem() within sim/pokemon.js
+		// Item suppression implemented in BattlePokemon.ignoringItem() within battle-engine.js
 		id: "klutz",
 		name: "Klutz",
 		rating: -1,
@@ -1674,7 +1670,7 @@ exports.BattleAbilities = {
 	"levitate": {
 		desc: "This Pokemon is immune to Ground. Gravity, Ingrain, Smack Down, Thousand Arrows, and Iron Ball nullify the immunity.",
 		shortDesc: "This Pokemon is immune to Ground; Gravity/Ingrain/Smack Down/Iron Ball nullify it.",
-		// airborneness implemented in sim/pokemon.js:Pokemon#isGrounded
+		// airborneness implemented in battle-engine.js:BattlePokemon#isGrounded
 		id: "levitate",
 		name: "Levitate",
 		rating: 3.5,
@@ -2078,7 +2074,7 @@ exports.BattleAbilities = {
 					// this.add('-message', "" + curPoke + " skipped: Natural Cure already known");
 					continue;
 				}
-				let template = Dex.getTemplate(curPoke.species);
+				let template = Tools.getTemplate(curPoke.species);
 				// pokemon can't get Natural Cure
 				if (Object.values(template.abilities).indexOf('Natural Cure') < 0) {
 					// this.add('-message', "" + curPoke + " skipped: no Natural Cure");
@@ -2687,7 +2683,7 @@ exports.BattleAbilities = {
 			duration: 1,
 			onBasePowerPriority: 8,
 			onBasePower: function (basePower, pokemon, target, move) {
-				return this.chainModify([0x1333, 0x1000]);
+				return this.chainModify([0x14CD, 0x1000]);
 			},
 		},
 		id: "refrigerate",
@@ -3013,7 +3009,7 @@ exports.BattleAbilities = {
 		num: 19,
 	},
 	"shieldsdown": {
-		desc: "If this Pokemon is a Minior, it changes to its Core forme if it has 1/2 or less of its maximum HP, and changes to Meteor Form if it has more than 1/2 its maximum HP. This check is done on switch-in and at the end of each turn. While in its Meteor Form, it cannot become affected by major status conditions. Moongeist Beam, Sunsteel Strike, and the Abilities Mold Breaker, Teravolt, and Turboblaze cannot ignore this Ability.",
+		desc: "If this Pokemon is a Minior, it changes to its Core forme if it has 1/2 or less of its maximum HP, and changes to Meteor Form if it has more than 1/2 its maximum HP. This check is done on switch-in and at the end of each turn. While in its Meteor Form, it cannot become affected by major status conditions.",
 		shortDesc: "If Minior, switch-in/end of turn it changes to Core at 1/2 max HP or less, else Meteor.",
 		onStart: function (pokemon) {
 			if (pokemon.baseTemplate.baseSpecies !== 'Minior' || pokemon.transformed) return;
@@ -3050,13 +3046,6 @@ exports.BattleAbilities = {
 			this.add('-immune', target, '[msg]', '[from] ability: Shields Down');
 			return false;
 		},
-		onTryAddVolatile: function (status, target) {
-			if (target.template.speciesid !== 'miniormeteor' || target.transformed) return;
-			if (status.id !== 'yawn') return;
-			this.add('-immune', target, '[msg]', '[from] ability: Shields Down');
-			return null;
-		},
-		isUnbreakable: true,
 		id: "shieldsdown",
 		name: "Shields Down",
 		rating: 2.5,
@@ -3714,7 +3703,10 @@ exports.BattleAbilities = {
 		shortDesc: "On switch-in, or when it can, this Pokemon copies a random adjacent foe's Ability.",
 		onUpdate: function (pokemon) {
 			if (!pokemon.isStarted) return;
-			let possibleTargets = pokemon.side.foe.active.filter(foeActive => foeActive && this.isAdjacent(pokemon, foeActive));
+			let possibleTargets = [];
+			for (let i = 0; i < pokemon.side.foe.active.length; i++) {
+				if (pokemon.side.foe.active[i] && !pokemon.side.foe.active[i].fainted) possibleTargets.push(pokemon.side.foe.active[i]);
+			}
 			while (possibleTargets.length) {
 				let rand = 0;
 				if (possibleTargets.length > 1) rand = this.random(possibleTargets.length);
