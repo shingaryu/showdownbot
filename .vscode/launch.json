@@ -10,8 +10,10 @@
             "name": "Launch Program",
             "program": "${workspaceFolder}\\bot.js",
             "args": [
-            "--startchallenging"    
-            ]
+            //"--startchallenging"    
+            "--ranked"
+            ],
+            "console": "integratedTerminal"
         }
     ]
 }
