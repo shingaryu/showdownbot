@@ -630,6 +630,12 @@ var BattleRoom = new JS.Class({
             return;
         }
 
+        // We should update the request object manually, and it will be used by bots
+        if(request.side.id === "p1")
+        {
+            this.state.p1.request = { active: request.active, side: request.side };           
+        }
+
         if (request.side) this.updateSide(request.side, true);
 
         if (request.active) logger.info(this.title + ": I need to make a move.");
