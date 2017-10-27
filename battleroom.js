@@ -630,11 +630,6 @@ var BattleRoom = new JS.Class({
             return;
         }
 
-        // We should update the request object manually, and it will be used by bots
-        if(request.side.id === "p1")
-        {
-            this.state.p1.request = { active: request.active, side: request.side };           
-        }
 
         if (request.side) this.updateSide(request.side, true);
 
@@ -729,6 +724,9 @@ var BattleRoom = new JS.Class({
         var room = this;
 
         setTimeout(function() {
+            // The state of the battle was modified everywhere in previous processes, so at this time we update the request objects again 
+            room.state.makeRequest()       
+           
             if(program.net === "update") {
                 if(room.previousState != null) minimaxbot.train_net(room.previousState, room.state);
                 room.previousState = clone(room.state);
