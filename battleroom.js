@@ -234,8 +234,10 @@ var BattleRoom = new JS.Class({
             return;
         }
 
+        let isFainted = (health === 0 || maxHealth === 'fnt'); // If fainted, maxHealth is not a number
+
         //update hp
-        pokemon.hp = Math.ceil(health / maxHealth * pokemon.maxhp);
+        pokemon.hp = isFainted ? 0 : Math.ceil(health / maxHealth * pokemon.maxhp);
         this.updatePokemon(battleside, pokemon);
 
     },
@@ -652,7 +654,7 @@ var BattleRoom = new JS.Class({
             var level = parseInt(details[1].trim().substring(1));
             var gender = details[2] ? details[2].trim() : null;
 
-            var template = {
+            var templateFromSideData = {
                 name: name,
                 moves: pokemon.moves,
                 ability: Abilities[pokemon.baseAbility].name,
@@ -678,6 +680,9 @@ var BattleRoom = new JS.Class({
                 shiny: false
             };
 
+            let template = this.state.getTemplate(name);
+            Object.assign(template, templateFromSideData);
+            
             //keep track of old pokemon
             var oldPokemon = this.state.p1.pokemon[i];
 
