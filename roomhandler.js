@@ -122,7 +122,7 @@ function recieve(data) {
 			var challenges = JSON.parse(data.substr(18));
 			if(challenges.challengesFrom) {
 				for(var user in challenges.challengesFrom) {
-					if(challenges.challengesFrom[user] == "gen7randombattle") {
+					if(challenges.challengesFrom[user] == "gen6randombattle") {
 						logger.info("Accepting challenge from " + user);
 						send("/accept " + user);
 					} else {
