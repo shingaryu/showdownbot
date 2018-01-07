@@ -6,10 +6,6 @@ JS.require('JS.Class');
 
 require("sugar");
 
-// Account file
-var bot = require("./bot.js");
-var account = bot.account;
-
 // Results database
 var db = require("./db");
 
@@ -29,8 +25,6 @@ var _ = require("underscore");
 
 var clone = require("./clone");
 
-var program = require('commander'); // Get Command-line arguments
-
 var BattleRoom = new JS.Class({
     initialize: function(id, sendfunc) {
         this.id = id;
@@ -46,7 +40,7 @@ var BattleRoom = new JS.Class({
         this.previousState = null; // For TD Learning
 
         setTimeout(function() {
-            sendfunc(account.message, id); // Notify User that this is a bot
+            sendfunc(global.account.message, id); // Notify User that this is a bot
             sendfunc("/timer", id); // Start timer (for user leaving or bot screw ups)
         }, 10000);
 
@@ -513,7 +507,7 @@ var BattleRoom = new JS.Class({
                     this.send("gg", this.id);
 
                     this.winner = tokens[2];
-                    if (this.winner == account.username) {
+                    if (this.winner == global.account.username) {
                         logger.info(this.title + ": I won this game");
                     } else {
                         logger.info(this.title + ": I lost this game");
@@ -523,7 +517,7 @@ var BattleRoom = new JS.Class({
                         var playerAlive = _.any(this.state.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
                         var opponentAlive = _.any(this.state.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
 
-                        if(!playerAlive || !opponentAlive) minimaxbot.train_net(this.previousState, null, (this.winner == account.username));
+                        if(!playerAlive || !opponentAlive) minimaxbot.train_net(this.previousState, null, (this.winner == global.account.username));
                     }
 
                     if(!program.nosave) this.saveResult();
@@ -615,7 +609,7 @@ var BattleRoom = new JS.Class({
         game = {
             "title": this.title,
             "id": this.id,
-            "win": (this.winner == account.username),
+            "win": (this.winner == global.account.username),
             "date": new Date(),
             "decisions": "[]", //JSON.stringify(this.decisions),
             "log": this.log,
@@ -738,7 +732,7 @@ var BattleRoom = new JS.Class({
             }
 
             var decision = BattleRoom.parseRequest(request);
-
+           
             // Use specified algorithm to determine resulting choice
             var result = undefined;
             if(decision.choices.length == 1) result = decision.choices[0];

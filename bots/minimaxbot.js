@@ -3,7 +3,6 @@ var log4js = require('log4js');
 var logger = require('log4js').getLogger("minimax");
 var learnlog = require('log4js').getLogger("learning");
 
-var program = require('commander'); // Program settings
 var fs = require('fs');
 
 var _ = require("underscore");
@@ -60,7 +59,7 @@ function featureVector(battle) {
 // Initialize neural network
 var net = undefined;
 var trainer = undefined;
-if(program.net === "create") {
+if(global.program.net === "create") {
     learnlog.info("Creating neural network...");
 
     // Multi-layer neural network
@@ -85,9 +84,9 @@ if(program.net === "create") {
     });
 
     fs.writeFileSync("network.json", JSON.stringify(net.toJSON()));
-    program.net = "update"; // Now that the network is created, it should also be updated
+    global.program.net = "update"; // Now that the network is created, it should also be updated
     learnlog.info("Created neural network...");
-} else if(program.net === "use" || program.net === "update") {
+} else if(global.program.net === "use" || global.program.net === "update") {
     learnlog.info("Loading neural network...");
     net = new convnetjs.Net();
     net.fromJSON(JSON.parse(fs.readFileSync("network.json", "utf8")));
@@ -95,7 +94,7 @@ if(program.net === "create") {
 module.exports.net = net;
 
 // If we need to be able to update the network, create a trainer object
-if(program.net === "update") {
+if(global.program.net === "update") {
     trainer = new convnetjs.Trainer(net, {method: 'adadelta', l2_decay: 0.001,
         batch_size: 1});
     learnlog.trace("Created SGD Trainer");
@@ -264,11 +263,11 @@ function eval(battle) {
     var value = 0;
     var features = getFeatures(battle);
 
-    if(program.net === "none") {
+    if(global.program.net === "none") {
         for (var key in weights) {
             if(key in features) value += weights[key] * features[key];
         }
-    } else if (program.net === "update" || program.net === "use") {
+    } else if (global.program.net === "update" || global.program.net === "use") {
         var vec = featureVector(battle);
         value = net.forward(vec).w[0];
     }
