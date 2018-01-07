@@ -45,6 +45,7 @@ var BattleRoom = new JS.Class({
         }, 10000);
 
         this.decisions = [];
+        this.teamPreviewRequest = {};
         this.log = "";
 
         this.state.start();
@@ -495,6 +496,7 @@ var BattleRoom = new JS.Class({
         }
 
         var log = data.split('\n');
+        const teamPreviewPokes = [];
         for (var i = 0; i < log.length; i++) {
             this.log += log[i] + "\n";
 
@@ -528,6 +530,18 @@ var BattleRoom = new JS.Class({
                         battleroom.send("/leave " + battleroom.id);
                     }, 2000);
 
+                } else if (tokens[1] === 'poke') {
+                    // information for teampreview
+                    // store data for 'teampreview' message in following lines
+                    const poke = {
+                        side: tokens[2],
+                        details: tokens[3],
+                        hasItem: tokens.length === 5 && tokens[4] === 'item'
+                    };
+                    teamPreviewPokes.push(poke);
+                } else if (tokens[1] ==='teampreview') {
+                    const maxTeamSize = tokens[2];
+                    this.chooseTeamPokes(teamPreviewPokes);
                 } else if (tokens[1] === 'switch' || tokens[1] === 'drag') {
                     this.updatePokemonOnSwitch(tokens);
                 } else if (tokens[1] === 'move') {
@@ -626,13 +640,17 @@ var BattleRoom = new JS.Class({
             return;
         }
 
-
-        if (request.side) this.updateSide(request.side, true);
-
-        if (request.active) logger.info(this.title + ": I need to make a move.");
-        if (request.forceSwitch) logger.info(this.title + ": I need to make a switch.");
-
-        if (request.active || request.forceSwitch) this.makeMove(request);
+        if (request.teamPreview === true) {
+            this.teamPreviewRequest = request;
+            // team pokemon choice will be done with following messages
+        } else {
+            if (request.side) this.updateSide(request.side, true);
+    
+            if (request.active) logger.info(this.title + ": I need to make a move.");
+            if (request.forceSwitch) logger.info(this.title + ": I need to make a switch.");
+    
+            if (request.active || request.forceSwitch) this.makeMove(request);
+        }
     },
 
     //note: we should not be recreating pokemon each time
@@ -718,6 +736,21 @@ var BattleRoom = new JS.Class({
         this.side = sideData.id;
         this.oppSide = (this.side === "p1") ? "p2" : "p1";
         logger.info(this.title + ": My current side is " + this.side);
+    },
+    chooseTeamPokes: function(pokes) {
+        logger.info("Choose team pokemons...");
+
+        // temporary random selection
+        // in the future, use some algorithms to decide which combination is strongest to oppenents
+        const teamOrderNums = [1, 2, 3, 4, 5, 6];
+        for(let i = teamOrderNums.length - 1; i > 0; i--){
+            const r = Math.floor(Math.random() * (i + 1));
+            const tmp = teamOrderNums[i];
+            teamOrderNums[i] = teamOrderNums[r];
+            teamOrderNums[r] = tmp;
+        }
+
+        this.send("/team " + teamOrderNums.join('') + '|' + this.teamPreviewRequest.rqid, this.id);
     },
     makeMove: function(request) {
         var room = this;
