@@ -33,8 +33,16 @@ var BattleRoom = new JS.Class({
 
         // Construct a battle object that we will modify as our state
         this.state = require('./battle-engine/battle-engine').construct('base', false, null);
-        this.state.join('p1', 'botPlayer'); // We will be player 1 in our local simulation
-        this.state.join('p2', 'humanPlayer');
+        // Default team is automatically filled by 6 Bulbasaur
+        // In our local simulation in the future, Bulbasaur means unknown and temporary slot
+        const team1 = [];
+        const team2 = [];
+        for (let i = 0; i < 6; i++) {
+            team1.push(Tools.getTemplate('Bulbasaur'));
+            team2.push(Tools.getTemplate('Bulbasaur'));
+        }
+        this.state.join('p1', 'botPlayer', 1, team1); // We will be player 1 in our local simulation
+        this.state.join('p2', 'humanPlayer', 1, team2);
         this.state.reportPercentages = true;
 
         this.previousState = null; // For TD Learning

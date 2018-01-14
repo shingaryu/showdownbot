@@ -1437,7 +1437,7 @@ class BattleSide {
 
 		this.team = this.battle.getTeam(this, team);
 		for (let i = 0; i < this.team.length && i < 6; i++) {
-			this.pokemon.push(new BattlePokemon(Tools.getTemplate('Bulbasaur'), this));
+			this.pokemon.push(new BattlePokemon(this.team[i], this));
 		}
 		this.pokemonLeft = this.pokemon.length;
 		for (let i = 0; i < this.pokemon.length; i++) {

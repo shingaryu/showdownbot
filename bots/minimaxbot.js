@@ -185,7 +185,7 @@ function getFeatures(battle) {
     });
 
     // Per pokemon features
-    for(var i = 0; i < 6; ++i) {
+    for(var i = 0; i < battle.p1.pokemon.length; ++i) {
         features["p1_hp"] += (battle.p1.pokemon[i].hp ? battle.p1.pokemon[i].hp : 0) / battle.p1.pokemon[i].maxhp;
         features["p2_hp"] += (battle.p2.pokemon[i].hp ? battle.p2.pokemon[i].hp : 0) / battle.p2.pokemon[i].maxhp;
 
