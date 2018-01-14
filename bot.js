@@ -152,3 +152,33 @@ if(client) {
 		logger.error(e);
 	});
 }
+
+// onevsonetest();
+
+function onevsonetest () {
+let minimaxbot = require("./bots/minimaxbot");
+let clone = require("./clone");
+
+logger.debug("1 vs 1 test");
+battle = require('./battle-engine/battle-engine').construct('base', false, null);
+const poke1 = battle.getTemplate("Raikou");
+poke1.moves = poke1.randomBattleMoves;
+poke1.level = 50;
+const poke2 = battle.getTemplate("Tyranitar");
+poke2.moves = poke2.randomBattleMoves;
+poke2.level = 50;
+battle.join('p1', 'Guest 1', 1, [poke1]);
+battle.join('p2', 'Guest 2', 1, [poke2]);
+battle.start();
+logger.debug("pokemons created");
+console.dir(poke1);
+console.dir(poke2);
+
+battle.makeRequest();    
+console.dir("request:: " + battle.p1.request[0]);
+
+const decision = BattleRoom.parseRequest(battle.p1.request);
+console.dir("decision " +  decision[0]);
+const result = minimaxbot.decide(clone(battle), decision.choices);
+console.dir(result);
+}
