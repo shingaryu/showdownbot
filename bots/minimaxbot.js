@@ -282,7 +282,7 @@ var decide = module.exports.decide = function(battle, choices) {
     var startTime = new Date();
     battle.start();
 
-    var MAX_DEPTH = 2; //for now...
+    var MAX_DEPTH = 1; //for now...
     var maxNode = playerTurn(battle, MAX_DEPTH, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices);
     if(!maxNode.action) return randombot.decide(battle, choices);
     logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);

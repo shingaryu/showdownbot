@@ -53,7 +53,7 @@ var BattleRoom = new JS.Class({
         }, 10000);
 
         this.decisions = [];
-        this.teamPreviewRequest = {};
+        this.teamPreviewRequest = {}; // my team information
         this.log = "";
 
         this.state.start();
@@ -546,6 +546,7 @@ var BattleRoom = new JS.Class({
                         details: tokens[3],
                         hasItem: tokens.length === 5 && tokens[4] === 'item'
                     };
+                    // console.dir(poke);
                     teamPreviewPokes.push(poke);
                 } else if (tokens[1] ==='teampreview') {
                     const maxTeamSize = tokens[2];
@@ -747,10 +748,11 @@ var BattleRoom = new JS.Class({
     },
     chooseTeamPokes: function(pokes) {
         logger.info("Choose team pokemons...");
-
+        logger.debug(this.teamPreviewRequest);
+        console.dir(pokes);
         // temporary random selection
         // in the future, use some algorithms to decide which combination is strongest to oppenents
-        const teamOrderNums = [1, 2, 3, 4, 5, 6];
+        let teamOrderNums = [1, 2, 3, 4, 5, 6];
         for(let i = teamOrderNums.length - 1; i > 0; i--){
             const r = Math.floor(Math.random() * (i + 1));
             const tmp = teamOrderNums[i];
@@ -758,7 +760,196 @@ var BattleRoom = new JS.Class({
             teamOrderNums[r] = tmp;
         }
 
-        this.send("/team " + teamOrderNums.join('') + '|' + this.teamPreviewRequest.rqid, this.id);
+        const myTeam = [];
+        const oppTeam = [];
+        pokes.forEach(poke => {
+            const name = poke.details.split(',').slice(0, 1);
+            logger.debug("new poke " + name);
+            const newPoke = this.state.getTemplate(name.toString());
+            newPoke.moves = newPoke.randomBattleMoves;
+            newPoke.level = 50;
+            if (poke.side === 'p2') {
+                myTeam.push(newPoke);
+            } else {
+                oppTeam.push(newPoke);
+            }
+            // console.dir(newPoke);
+        })
+
+        const rank = this.searchTeamCombination(myTeam, oppTeam);
+        for (let i = 5; i >= 0; i--) {
+            if(teamOrderNums[i] === rank[0] || teamOrderNums[i] === rank[1] || teamOrderNums[i] === rank[2]) {
+                teamOrderNums.splice(i, 1);
+            }
+        }
+        
+
+        this.send("/team " + rank.join('') + teamOrderNums.join('') + '|' + this.teamPreviewRequest.rqid, this.id);
+    },
+    searchTeamCombination: function(myTeam, oppTeam) {
+        logger.debug("start searching team combination")
+        const battleEngine = require('./battle-engine/battle-engine');
+        const evalValueTable = [];
+        myTeam.forEach(myPoke => {
+            const evalRecord = [];
+            oppTeam.forEach(oppPoke => {
+                logger.debug("evaluate about " + myPoke.name + " vs " + oppPoke.name);
+                const battle = battleEngine.construct('base', false, null);
+                battle.join('p1', 'Guest 1', 1, [myPoke]);
+                battle.join('p2', 'Guest 2', 1, [oppPoke]);
+                battle.start();              
+                battle.makeRequest();                   
+                const decision = BattleRoom.parseRequest(battle.p1.request);
+                const evalValue = minimaxbot.decide(clone(battle), decision.choices).tree.value;
+                logger.debug("evalValue: " + evalValue);
+                evalRecord.push(evalValue);
+                });
+            evalValueTable.push(evalRecord);
+        });
+
+        logger.debug("contents of evalvalueTable:");
+        evalValueTable.forEach(record => {
+            record.forEach(val => {
+                console.log(val + '|');
+            })
+            console.log('\n');
+        })
+
+        let norms = evalValueTable.map(vector => {
+            let sum = 0;
+            vector.forEach(element =>{
+                sum += element;
+            })
+            return sum;
+        });
+
+        let normObjs = [];
+        for (let i = 0; i < 6; i++) {
+            normObjs.push({ index: i, norm: norms[i]});
+        }
+
+        normObjs.sort((a, b) => {
+            if (a.norm < b.norm) return 1;
+        });
+
+        let selectedPokes = [];
+        selectedPokes.push(normObjs[0].index);
+        logger.debug("first of norm " + normObjs[0].index);
+
+        let currentVector = evalValueTable[normObjs[0].index];
+        while (selectedPokes.length < 3) {
+            let weakestSlot = this.minimumIndex(currentVector);
+            logger.debug("weakestslot " + weakestSlot);
+
+            let strongestPoke = -1;
+            let strongestValue = Number.MIN_SAFE_INTEGER;
+            for (let i = 0; i < 6; i++) {
+                if (selectedPokes.some((element, index, array) => {
+                    return element === i;
+                })) {
+                    continue;
+                }
+
+                if (strongestValue < evalValueTable[i][weakestSlot]) {
+                    strongestPoke = i;
+                    strongestValue = evalValueTable[i][weakestSlot];
+                }
+            }
+
+            logger.debug("strongestPoke " + strongestPoke);
+            logger.debug("strongestValue " + strongestValue);
+            selectedPokes.push(strongestPoke);
+            for (let i = 0; i < 6; i++) {
+                currentVector[i] += evalValueTable[strongestPoke][i];
+            }
+        }
+
+        return selectedPokes;
+
+
+        // let first = this.maximumIndex(norms);
+        // let maximumNorm = norms[0];
+        // for (let i = 0; i < evalValueTable.length; i++) {
+        //     if (maximumNorm < norms[i]) {
+        //         first = i;
+        //         maximumNorm = norms[i];
+        //     }
+        // }
+
+        // let unitMaximum = -1000000000000;
+        // let unitMaxIndex = -1;
+        // for (let i = 0; i < 6; i++) {
+        //     let thisNorm = 0;
+        //     evalValueTable[i].forEach(val =>{
+        //         thisNorm += val;
+        //     })
+        //     if (unitMaximum < thisNorm)
+        //     {
+        //         unitMaximum = thisNorm;
+        //         unitMaxIndex = i;
+        //     }
+        // }
+
+        // let unitSecondIndex = -1;
+        // unitMaximum = -1000000000000;
+        // for (let i = 0; i < 6; i++) {
+        //     if(i === unitMaxIndex){
+        //         continue;
+        //     }
+        //     let thisNorm = 0;
+        //     evalValueTable[i].forEach(val =>{
+        //         thisNorm += val;
+        //     })
+        //     if (unitMaximum < thisNorm)
+        //     {
+        //         unitMaximum = thisNorm;
+        //         unitMaxIndex = i;
+        //     }
+        // }
+       
+        // let unitThirdIndex = -1;
+        // unitMaximum = -1000000000000;
+        // for (let i = 0; i < 6; i++) {
+        //     if(i === unitMaxIndex || i === unitSecondIndex){
+        //         continue;
+        //     }
+        //     let thisNorm = 0;
+        //     evalValueTable[i].forEach(val =>{
+        //         thisNorm += val;
+        //     })
+        //     if (unitMaximum < thisNorm)
+        //     {
+        //         unitMaximum = thisNorm;
+        //         unitMaxIndex = i;
+        //     }
+        // }
+
+        // logger.debug(unitMaxIndex + unitSecondIndex + unitThirdIndex);
+        // return [unitMaxIndex, unitSecondIndex, unitThirdIndex];
+    },
+    maximumIndex: function(norms) {
+        let first = 0;
+        let maximumNorm = norms[0];
+        for (let i = 0; i < norms.length; i++) {
+            if (maximumNorm < norms[i]) {
+                first = i;
+                maximumNorm = norms[i];
+            }
+        }
+
+        return first;
+    },
+    minimumIndex: function(norms) {
+        let first = 0;
+        let minimumNorm = norms[0];
+        for (let i = 0; i < norms.length; i++) {
+            if (minimumNorm > norms[i]) {
+                first = i;
+                minimumNorm = norms[i];
+            }
+        }
+
+        return first;
     },
     makeMove: function(request) {
         var room = this;
