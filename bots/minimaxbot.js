@@ -221,7 +221,7 @@ function getFeatures(battle) {
     // Record this for opponent as well
     if(features["p1_slp_count"] > 1)
         features["p1_slp_count"] = -GAME_END_REWARD;
-    if(features["p2_slp_count"] < 1)
+    if(features["p2_slp_count"] > 1)
         features["p2_slp_count"] = -GAME_END_REWARD;
     //features["p1_slp_count"] = Math.min(features["p1_slp_count"], 1);
     //features["p2_slp_count"] = Math.min(features["p2_slp_count"], 1);
