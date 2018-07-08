@@ -776,7 +776,7 @@ var BattleRoom = new JS.Class({
             // console.dir(newPoke);
         })
 
-        const rank = this.searchTeamCombination(myTeam, oppTeam);
+        const rank = this.searchTeamCombination(myTeam, oppTeam).map(pokeIndex => pokeIndex + 1);
         for (let i = 5; i >= 0; i--) {
             if(teamOrderNums[i] === rank[0] || teamOrderNums[i] === rank[1] || teamOrderNums[i] === rank[2]) {
                 teamOrderNums.splice(i, 1);
@@ -800,20 +800,27 @@ var BattleRoom = new JS.Class({
                 battle.start();              
                 battle.makeRequest();                   
                 const decision = BattleRoom.parseRequest(battle.p1.request);
-                const evalValue = minimaxbot.decide(clone(battle), decision.choices).tree.value;
+                const evalValue = minimaxbot.decide(clone(battle), decision.choices, false).tree.value;
                 logger.debug("evalValue: " + evalValue);
                 evalRecord.push(evalValue);
                 });
             evalValueTable.push(evalRecord);
         });
 
-        logger.debug("contents of evalvalueTable:");
-        evalValueTable.forEach(record => {
-            record.forEach(val => {
-                console.log(val + '|');
-            })
-            console.log('\n');
-        })
+        logger.debug("evaluation value table is below: ");
+        let tableHeader = '        ,';
+        oppTeam.forEach(oppPoke => {
+            tableHeader += oppPoke.name + ',';
+        });
+        console.log(tableHeader);
+        for (let i = 0; i < myTeam.length; i++) {
+            let tableRecord = '';
+            tableRecord += myTeam[i].name + ',';
+            evalValueTable[i].forEach(evalValue => {
+                tableRecord += evalValue + ',';
+            });
+            console.log(tableRecord);
+        }
 
         let norms = evalValueTable.map(vector => {
             let sum = 0;
@@ -831,6 +838,10 @@ var BattleRoom = new JS.Class({
         normObjs.sort((a, b) => {
             if (a.norm < b.norm) return 1;
         });
+
+        normObjs.forEach(obj => {
+            console.log(obj.index + ': ' + obj.norm);
+        })
 
         let selectedPokes = [];
         selectedPokes.push(normObjs[0].index);

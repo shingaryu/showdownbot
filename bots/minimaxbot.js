@@ -278,12 +278,12 @@ function eval(battle) {
 
 var overallMinNode = {};
 var lastMove = '';
-var decide = module.exports.decide = function(battle, choices) {
+var decide = module.exports.decide = function(battle, choices, useGameEndReward = true) {
     var startTime = new Date();
     battle.start();
 
     var MAX_DEPTH = 1; //for now...
-    var maxNode = playerTurn(battle, MAX_DEPTH, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices);
+    var maxNode = playerTurn(battle, MAX_DEPTH, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices, useGameEndReward);
     if(!maxNode.action) return randombot.decide(battle, choices);
     logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);
     if(overallMinNode.action)
@@ -303,7 +303,7 @@ var DISCOUNT = module.exports.DISCOUNT = 0.98;
 
 //TODO: Implement move ordering, which can be based on the original greedy algorithm
 //However, it should have slightly different priorities, such as status effects...
-function playerTurn(battle, depth, alpha, beta, givenchoices) {
+function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward = true) {
 	logger.trace("Player turn at depth " + depth);
 
 	// Node in the minimax tree
@@ -321,7 +321,9 @@ function playerTurn(battle, depth, alpha, beta, givenchoices) {
 	var playerAlive = _.any(battle.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
 	var opponentAlive = _.any(battle.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
 	if (!playerAlive || !opponentAlive) {
+        if (useGameEndReward) {
 		node.value = playerAlive ? GAME_END_REWARD : -GAME_END_REWARD;
+        }
 		return node;
 	}
 
@@ -331,7 +333,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices) {
 	} else {
 		// If the request is a wait request, the opposing player has to take a turn, and we don't
 		if(battle.p1.request.wait) {
-			return opponentTurn(battle, depth, alpha, beta, null);
+			return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward);
 		}
 		var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
             //sort choices
@@ -364,7 +366,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices) {
                     continue;
 
 		// Try action
-		var minNode = opponentTurn(battle, depth, alpha, beta, choices[i]);
+		var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward);
 		node.children.push(minNode);
 
 		if(minNode.value != null && isFinite(minNode.value) ) {
@@ -384,7 +386,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices) {
 	return node;
 }
 
-function opponentTurn(battle, depth, alpha, beta, playerAction) {
+function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward = true) {
 	logger.trace("Opponent turn turn at depth " + depth);
 
 	// Node in the minimax tree
@@ -403,7 +405,7 @@ function opponentTurn(battle, depth, alpha, beta, playerAction) {
 		var newbattle = clone(battle);
 		newbattle.p2.decision = true;
 		newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
-		return playerTurn(newbattle, depth - 1, alpha, beta);
+		return playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
 	}
 
 	var choices = BattleRoom.parseRequest(battle.p2.request).choices;
@@ -457,7 +459,7 @@ function opponentTurn(battle, depth, alpha, beta, playerAction) {
                 for(var j = 0; j < newbattle.p2.pokemon.length; j++) {
                     logger.info(newbattle.p2.pokemon[j].id + ": " + newbattle.p2.pokemon[j].hp + "/" + newbattle.p2.pokemon[j].maxhp);
                 }
-		var maxNode = playerTurn(newbattle, depth - 1, alpha, beta);
+		var maxNode = playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
 		node.children.push(maxNode);
 
 		if(maxNode.value != null && isFinite(maxNode.value)) {
