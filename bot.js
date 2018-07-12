@@ -122,9 +122,21 @@ function rename(name, password) {
 	});
 }
 
-logger.info("Fork child process of room handler...");
-const childProcess = require('child_process').fork('./roomhandler', [JSON.stringify(global.account), JSON.stringify(global.program)]);
-childProcess.on('message', (msg) => {
+// When you debug, you cannot use child process 
+// const useChildProcess = true;
+const useChildProcess = false;
+
+let roomHanderProcess;
+if (useChildProcess) {
+	logger.info("Fork child process of room handler...");
+	roomHanderProcess = require('child_process').fork('./roomhandler', [JSON.stringify(global.account), JSON.stringify(global.program)]);
+} else {
+	logger.info("Import room handler as parent process...");
+	require('./roomhandler');
+	roomHanderProcess = process;
+}
+
+roomHanderProcess.on(useChildProcess? 'message' : 'fromRoomHandler', (msg) => {
 	if(msg.substr(0, 6) === 'rename') {
 		const data = msg.split('|');
 		CHALLENGE_KEY_ID = data[1];
@@ -145,7 +157,11 @@ if(client) {
 	});
 
 	client.on('data', function(msg) {
-		childProcess.send(msg);
+		if (useChildProcess) {
+			roomHanderProcess.send(msg);
+		} else {
+			process.emit('fromBot', msg);
+		}
 	});
 
 	client.on('error', function(e) {

@@ -1,15 +1,19 @@
 /**************************************************************************
- * This module is supposed to run as a child process.
- * The parent process is connected to Showdown server, 
+ * This module can be run as either parent process or child process.
+ * Regardless this condition, bot is connected to Showdown server, 
  * and messages it received from the server are sent directly to here.
  **************************************************************************/
+
+const isChildProcess = module === process.mainModule;
 
 const logger = require('log4js').getLogger("roomhandler");
 logger.info("Room handler starts!");
 
 // set global variables cloned from parent
-global.account = JSON.parse(process.argv[2]);
-global.program = JSON.parse(process.argv[3]);
+if (isChildProcess) {
+	global.account = JSON.parse(process.argv[2]);
+	global.program = JSON.parse(process.argv[3]);
+} 
 
 const BattleRoom = require('./battleroom');
 const util = require('./util');
@@ -18,13 +22,18 @@ const util = require('./util');
 const ROOMS = {};
 
 // when received a message from parent
-process.on('message', (msg) => {
+process.on(isChildProcess ? 'message' : 'fromBot', (msg) => {
 	recieve(msg);
 }) 
 
 // when send a message to parent
 function send(msg, room) {
-	process.send(room === undefined ? msg : msg + '@' + room);
+	const contents = room === undefined ? msg : msg + '@' + room;
+	if (isChildProcess) {
+		process.send(contents);
+	} else {
+		process.emit('fromRoomHandler', contents);
+	}
 }
 
 // Global recieve function - tries to interpret command, or send to the correct room
