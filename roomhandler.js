@@ -136,12 +136,7 @@ function recieve(data) {
 						send("/accept " + user);
 					} else if (challenges.challengesFrom[user] == "gen6battlespotsingles") {
 						// temporary hard-coded
-						const packedTeamStr = "|alakazammega|alakazite||psychic,encore,focusblast,protect|Timid|,,,252,,252||,0,,,,||50|]"
-											+ "|garchomp|lifeorb|H|earthquake,outrage,rockslide,swordsdance|Jolly|,252,,,4,252||||50|]"
-											+ "|magnezone|choicescarf|1|thunderbolt,voltswitch,flashcannon,hiddenpowerice|Timid|,,,252,4,252||,0,30,,,||50|]"
-											+ "|charizardmegax|charizarditex||dragonclaw,flareblitz,earthquake,outrage|Jolly|,252,,,4,252||||50|]"
-											+ "|gyarados|lumberry||aquatail,earthquake,crunch,icefang|Adamant|252,252,,,4,||||50|]"
-											+ "|aegislash|leftovers||flashcannon,kingsshield,shadowball,substitute|Calm|252,,,4,252,||,0,,,,||50|";
+						const packedTeamStr = require('./tools').packTeam(global.team);
 						send("/utm " + packedTeamStr);
 						send("/accept " + user);
 					} else {

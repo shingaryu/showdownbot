@@ -8,6 +8,7 @@ global.program
 	.option('--net [action]', "'create' - generate a new network. 'update' - use and modify existing network. 'use' - use, but don't modify network. 'none' - use hardcoded weights. ['none']", 'none')
 	.option('--algorithm [algorithm]', "Can be 'minimax', 'greedy', or 'random'. ['minimax']", "minimax")
 	.option('--account [file]', "File from which to load credentials. ['account.json']", "account.json")
+	.option('--team [file]', "File from which to load a battle team. ['team.txt']", "team.txt")
 	.option('--nosave', "Don't save games to the in-memory db.")
 	.option('--nolog', "Don't append to log files.")
         .option('--startchallenging', "Start out challenging, instead of requiring a manual activation first.")
@@ -55,6 +56,11 @@ if(!global.program.nolog) {
 
 // Login information for this bot
 global.account = JSON.parse(fs.readFileSync(global.program.account));
+
+// Battle team for this bot
+const teamText = fs.readFileSync(global.program.team, "utf8")
+logger.debug(teamText);
+global.team = require('./tools').importTeam(teamText);
 
 var webconsole = require("./console.js");// Web console
 

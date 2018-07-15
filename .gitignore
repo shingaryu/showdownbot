@@ -2,3 +2,4 @@ node_modules
 account.json
 *.log
 *.db
+team.txt
