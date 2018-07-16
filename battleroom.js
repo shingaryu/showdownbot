@@ -461,12 +461,21 @@ var BattleRoom = new JS.Class({
         } else {
             battleside = this.state.p2;
         }
-        //Note: crashes when the bot mega evolves.
         logger.info(pokeName + " has transformed into " + newPokeName + "!");
         var pokemon = this.getPokemon(battleside, pokeName, true);
+        const isMegaEvo = newPokeName.indexOf('-Mega') > 0;
+        if (isMegaEvo) {
+            logger.info('This is Mega evolution!');
+        }
 
         //apply forme change
-        pokemon.formeChange(newPokeName);
+        if (isMegaEvo) {
+            pokemon.canMegaEvo = newPokeName; // because updateSide() deleted this flag
+            this.state.runMegaEvo(pokemon);
+        } else {
+            pokemon.formeChange(newPokeName);
+        }
+
         this.updatePokemon(battleside, pokemon);
     },
     //for ditto exclusively
@@ -737,6 +746,12 @@ var BattleRoom = new JS.Class({
             }
 
             // TODO(rameshvarun): Somehow parse / load in current hp and status conditions
+        }
+
+        // Set canMegaEvo flag manually
+        const hasAlreadyMegaEvo = this.state.p1.pokemon.some(poke => poke.species.indexOf("-Mega") > 0);
+        if (hasAlreadyMegaEvo) {
+            this.state.p1.pokemon.forEach(poke => poke.canMegaEvo = false);
         }
 
         // Enforce that the active pokemon is in the first slot
