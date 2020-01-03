@@ -463,20 +463,19 @@ var BattleRoom = new JS.Class({
         }
         logger.info(pokeName + " has transformed into " + newPokeName + "!");
         var pokemon = this.getPokemon(battleside, pokeName, true);
-        const isMegaEvo = newPokeName.indexOf('Mega') > 0;
+        const isMegaEvo = newPokeName.indexOf('-Mega') > 0;
         if (isMegaEvo) {
             logger.info('This is Mega evolution!');
         }
 
         //apply forme change
         if (isMegaEvo) {
+            pokemon.canMegaEvo = newPokeName; // because updateSide() deleted this flag
             this.state.runMegaEvo(pokemon);
         } else {
             pokemon.formeChange(newPokeName);
         }
 
-        logger.debug('after mega evolve:');
-        logger.debug(pokemon);
         this.updatePokemon(battleside, pokemon);
     },
     //for ditto exclusively
@@ -505,10 +504,6 @@ var BattleRoom = new JS.Class({
         if (!data) return;
 
         logger.trace("<< " + data);
-        logger.info("p1 active species");
-        logger.info(this.state.p1.active[0].species);
-        logger.info("p1 active canmegaevo");
-        logger.info(this.state.p1.active[0].canMegaEvo);
 
         if (data.substr(0, 6) === '|init|') {
             return this.init(data);
@@ -751,6 +746,12 @@ var BattleRoom = new JS.Class({
             }
 
             // TODO(rameshvarun): Somehow parse / load in current hp and status conditions
+        }
+
+        // Set canMegaEvo flag manually
+        const hasAlreadyMegaEvo = this.state.p1.pokemon.some(poke => poke.species.indexOf("-Mega") > 0);
+        if (hasAlreadyMegaEvo) {
+            this.state.p1.pokemon.forEach(poke => poke.canMegaEvo = false);
         }
 
         // Enforce that the active pokemon is in the first slot
