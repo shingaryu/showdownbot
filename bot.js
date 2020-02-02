@@ -1,6 +1,6 @@
 // Command-line Arguments
-var program = require('commander');
-program
+global.program = require('commander');
+global.program
 	.option('--console', 'Only start the web console - not the game playing bot.')
 	.option('--host [url]', 'The websocket endpoint of the host to try to connect to. ["http://sim.smogon.com:8000/showdown"]', 'http://sim.smogon.com:8000/showdown')
 	.option('--port [port]', 'The port on which to serve the web console. [3000]', "3000")
@@ -8,6 +8,7 @@ program
 	.option('--net [action]', "'create' - generate a new network. 'update' - use and modify existing network. 'use' - use, but don't modify network. 'none' - use hardcoded weights. ['none']", 'none')
 	.option('--algorithm [algorithm]', "Can be 'minimax', 'greedy', or 'random'. ['minimax']", "minimax")
 	.option('--account [file]', "File from which to load credentials. ['account.json']", "account.json")
+	.option('--team [file]', "File from which to load a battle team. ['team.txt']", "team.txt")
 	.option('--nosave', "Don't save games to the in-memory db.")
 	.option('--nolog', "Don't append to log files.")
         .option('--startchallenging', "Start out challenging, instead of requiring a manual activation first.")
@@ -22,7 +23,7 @@ var log4js = require('log4js');
 log4js.loadAppender('file');
 var logger = require('log4js').getLogger("bot");
 
-if(!program.nolog) {
+if(!global.program.nolog) {
 	// Ensure that logging directory exists
 	if(!fs.existsSync("./logs")) { fs.mkdirSync("logs") };
 
@@ -54,15 +55,19 @@ if(!program.nolog) {
 }
 
 // Login information for this bot
-var account = JSON.parse(fs.readFileSync(program.account));
-module.exports.account = account;
+global.account = JSON.parse(fs.readFileSync(global.program.account));
+
+// Battle team for this bot
+const teamText = fs.readFileSync(global.program.team, "utf8")
+logger.debug(teamText);
+global.team = require('./tools').importTeam(teamText);
 
 var webconsole = require("./console.js");// Web console
 
 // Connect to server
 var sockjs = require('sockjs-client-ws');
 var client = null;
-if(!program.console) client = sockjs.create(program.host);
+if(!global.program.console) client = sockjs.create(global.program.host);
 
 // Domain (replay button redirects here)
 var DOMAIN = "http://play.pokemonshowdown.com/";
@@ -79,7 +84,7 @@ var CHALLENGE = null;
 var BattleRoom = require('./battleroom');
 
 // The game type that we want to search for on startup
-var GAME_TYPE = (program.ranked) ? "randombattle" : "unratedrandombattle";
+var GAME_TYPE = (global.program.ranked) ? "randombattle" : "unratedrandombattle";
 
 // Load in Game Data
 var Pokedex = require("./data/pokedex");
@@ -114,7 +119,7 @@ function rename(name, password) {
 	function (err, response, body) {
 		var data = util.safeJSON(body);
 		if(data && data.curuser && data.curuser.loggedin) {
-			send("/trn " + account.username + ",0," + data.assertion);
+			send("/trn " + global.account.username + ",0," + data.assertion);
 		} else {
 			// We couldn't log in for some reason
 			logger.fatal("Error logging in...");
@@ -123,152 +128,34 @@ function rename(name, password) {
 	});
 }
 
-// Global room counter (this allows multiple battles at the same time)
-var ROOMS = {};
-exports.ROOMS = ROOMS;
+// When you debug, you cannot use child process 
+// const useChildProcess = true;
+const useChildProcess = false;
 
-// Add a new room (only supports rooms of type battle)
-function addRoom(id, type) {
-	if(type == "battle") {
-		ROOMS[id] = new BattleRoom(id, send);
-		return ROOMS[id];
-	} else {
-		logger.error("Unkown room type: " + type);
-	}
-}
-// Remove a room from the global list
-function removeRoom(id) {
-	var room = ROOMS[id];
-	if(room) {
-		delete ROOMS[id];
-		return true;
-	}
-	return false;
+let roomHanderProcess;
+if (useChildProcess) {
+	logger.info("Fork child process of room handler...");
+	roomHanderProcess = require('child_process').fork('./roomhandler', [JSON.stringify(global.account), JSON.stringify(global.program)]);
+} else {
+	logger.info("Import room handler as parent process...");
+	require('./roomhandler');
+	roomHanderProcess = process;
 }
 
-// Code to execute once we have succesfully authenticated
-function onLogin() {
-    //do nothing
-
-
-}
-
-function searchBattle() {
-	logger.info("Searching for an unranked random battle");
-    send("/search " + GAME_TYPE);
-}
-module.exports.searchBattle = searchBattle;
-
-// Global recieve function - tries to interpret command, or send to the correct room
-function recieve(data) {
-	logger.trace("<< " + data);
-
-	var roomid = '';
-	if (data.substr(0,1) === '>') { // First determine if this command is for a room
-	    var nlIndex = data.indexOf('\n');
-		if (nlIndex < 0) return;
-		roomid = util.toRoomid(data.substr(1,nlIndex-1));
-		data = data.substr(nlIndex+1);
+roomHanderProcess.on(useChildProcess? 'message' : 'fromRoomHandler', (msg) => {
+	if(msg.substr(0, 6) === 'rename') {
+		const data = msg.split('|');
+		CHALLENGE_KEY_ID = data[1];
+		CHALLENGE = data[2];
+		rename(global.account.username, global.account.password);
 	}
-	if (data.substr(0,6) === '|init|') { // If it is an init command, create the room
-		if (!roomid) roomid = 'lobby';
-		var roomType = data.substr(6);
-		var roomTypeLFIndex = roomType.indexOf('\n');
-		if (roomTypeLFIndex >= 0) roomType = roomType.substr(0, roomTypeLFIndex);
-		roomType = util.toId(roomType);
-
-		logger.info(roomid + " is being opened.");
-		addRoom(roomid, roomType);
-
-	} else if ((data+'|').substr(0,8) === '|expire|') { // Room expiring
-		var room = ROOMS[roomid];
-		logger.info(roomid + " has expired.");
-		if(room) {
-			room.expired = true;
-			if (room.updateUser) room.updateUser();
-		}
-		return;
-	} else if ((data+'|').substr(0,8) === '|deinit|' || (data+'|').substr(0,8) === '|noinit|') {
-		if (!roomid) roomid = 'lobby';
-
-		// expired rooms aren't closed when left
-		if (ROOMS[roomid] && ROOMS[roomid].expired) return;
-
-		logger.info(roomid + " has been closed.");
-		removeRoom(roomid);
-		return;
+	else {
+		const data = msg.split('@');
+		const message = data[0];
+		const room = data[1];
+		send(message, room);
 	}
-	if(roomid) { //Forward command to specific room
-		if(ROOMS[roomid]) {
-			ROOMS[roomid].recieve(data);
-		} else {
-			logger.error("Room of id " + roomid + " does not exist to send data to.");
-		}
-		return;
-	}
-
-	// Split global command into parts
-	var parts;
-	if(data.charAt(0) === '|') {
-		parts = data.substr(1).split('|');
-	} else {
-		parts = [];
-	}
-
-	switch(parts[0]) {
-		// Recieved challenge string
-		case 'challenge-string':
-		case 'challstr':
-			logger.info("Recieved challenge string...");
-			CHALLENGE_KEY_ID = parseInt(parts[1], 10);
-			CHALLENGE = parts[2];
-
-			// Now try to rename to the given user
-			rename(account.username, account.password);
-			break;
-		// Server is telling us to update the user that we are currently logged in as
-		case 'updateuser':
-			// The update user command can actually come with a second command (after the newline)
-			var nlIndex = data.indexOf('\n');
-			if (nlIndex > 0) {
-				recieve(data.substr(nlIndex+1));
-				nlIndex = parts[3].indexOf('\n');
-				parts[3] = parts[3].substr(0, nlIndex);
-			}
-
-			var name = parts[1];
-			var named = !!+parts[2];
-
-			if(name == account.username) {
-				logger.info("Successfully logged in.");
-				onLogin()
-			}
-			break;
-		// Server tried to send us a popup
-		case 'popup':
-			logger.info("Popup: " + data.substr(7).replace(/\|\|/g, '\n'));
-			break;
-		// Someone has challenged us to a battle
-		case 'updatechallenges':
-			var challenges = JSON.parse(data.substr(18));
-			if(challenges.challengesFrom) {
-				for(var user in challenges.challengesFrom) {
-					if(challenges.challengesFrom[user] == "gen7randombattle") {
-						logger.info("Accepting challenge from " + user);
-						send("/accept " + user);
-					} else {
-						logger.warn("Won't accept challenge of type: " + challenges.challengesFrom[user]);
-						send("/reject " + user);
-					}
-				}
-			}
-			break;
-		// Unkown global command
-		default:
-			logger.warn("Did not recognize command of type: " + parts[0]);
-			break;
-	}
-}
+});
 
 if(client) {
 	client.on('connection', function() {
@@ -276,10 +163,44 @@ if(client) {
 	});
 
 	client.on('data', function(msg) {
-		recieve(msg);
+		if (useChildProcess) {
+			roomHanderProcess.send(msg);
+		} else {
+			process.emit('fromBot', msg);
+		}
 	});
 
 	client.on('error', function(e) {
 		logger.error(e);
 	});
+}
+
+// onevsonetest();
+
+function onevsonetest () {
+let minimaxbot = require("./bots/minimaxbot");
+let clone = require("./clone");
+
+logger.debug("1 vs 1 test");
+battle = require('./battle-engine/battle-engine').construct('base', false, null);
+const poke1 = battle.getTemplate("Raikou");
+poke1.moves = poke1.randomBattleMoves;
+poke1.level = 50;
+const poke2 = battle.getTemplate("Tyranitar");
+poke2.moves = poke2.randomBattleMoves;
+poke2.level = 50;
+battle.join('p1', 'Guest 1', 1, [poke1]);
+battle.join('p2', 'Guest 2', 1, [poke2]);
+battle.start();
+logger.debug("pokemons created");
+console.dir(poke1);
+console.dir(poke2);
+
+battle.makeRequest();    
+console.dir("request:: " + battle.p1.request[0]);
+
+const decision = BattleRoom.parseRequest(battle.p1.request);
+console.dir("decision " +  decision[0]);
+const result = minimaxbot.decide(clone(battle), decision.choices);
+console.dir(result);
 }

@@ -835,11 +835,22 @@ exports.BattleScripts = {
 	},
 
 	canMegaEvo: function (pokemon) {
+		let mega = false;
 		let altForme = pokemon.baseTemplate.otherFormes && this.getTemplate(pokemon.baseTemplate.otherFormes[0]);
 		let item = pokemon.getItem();
-		if (altForme && altForme.isMega && altForme.requiredMove && pokemon.moves.includes(toId(altForme.requiredMove)) && !item.zMove) return altForme.species;
-		if (item.megaEvolves !== pokemon.baseTemplate.baseSpecies || item.megaStone === pokemon.species) return false;
-		return item.megaStone;
+		if (altForme && altForme.isMega && altForme.requiredMove && pokemon.moves.includes(toId(altForme.requiredMove)) && !item.zMove) {
+			// return altForme.species;
+			mega = altForme.species;
+		}
+		if (item.megaEvolves !== pokemon.baseTemplate.baseSpecies || item.megaStone === pokemon.species) {
+			// return false;
+			mega = false;
+		}
+
+		// return item.megaStone;
+		mega = item.megaStone;
+
+		return mega;
 	},
 
 	runMegaEvo: function (pokemon) {
