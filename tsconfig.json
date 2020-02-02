@@ -1,0 +1,24 @@
+{
+    "compilerOptions": {
+        "lib": ["es2015", "es2016.array.include", "es2017.object"],
+        "noEmit": true,
+        "target": "esnext",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "strict": true,
+        "allowJs": true,
+        "checkJs": true
+    },
+    "types": ["node"],
+    "exclude": [
+        "./showdown-sources/.*-dist/**/*"
+    ],
+    "include": [
+        "./showdown-sources/config/formats.js",
+        "./showdown-sources/data/*",
+        "./showdown-sources/data/mods/*/*",
+        "./showdown-sources/lib/*",
+        "./showdown-sources/sim/**/*",
+        "./tools/set-import/*.ts"
+    ]
+}

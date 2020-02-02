@@ -6,14 +6,35 @@
     "configurations": [
         {
             "type": "node",
+            "request": "attach",
+            "name": "Attach to Child",
+            "port": 9230,
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "type": "node",
             "request": "launch",
-            "name": "Launch Program",
+            "name": "Launch Program without child process",
             "program": "${workspaceFolder}\\bot.js",
             "args": [
             //"--startchallenging"    
             "--ranked"
             ],
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "autoAttachChildProcesses": true
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Program with child process",
+            "program": "${workspaceFolder}\\bot.js",
+            "args": [
+                "--usechildprocess"    
+            ],
+            "console": "integratedTerminal",
+            // "autoAttachChildProcesses": true
         }
     ]
 }

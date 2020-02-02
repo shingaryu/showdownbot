@@ -1,0 +1,157 @@
+#tree-simple {
+  width: auto;
+  height: 800px;
+  overflow: auto;
+}
+
+.node {
+  border-radius: 10px;
+  /* border: solid 1px #fdc077; */
+  background-color: #f5cba8;
+  box-shadow: 2px 2px dimgrey;
+  color: #58360b;
+  /* font-weight: bold; */
+  padding: 10px;
+  padding-top: 15px;
+}
+
+#sample-span::before {
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+#sample-span::before {
+  font-family: "Font Awesome 5 Free";
+  /* font-family: "Font Awesome 5 Free"; */
+  font-weight: 900; 
+  content: "\f007";
+}
+
+.Treant .node > .collapse-switch {
+  width: 20px;
+  height: 40px;
+  border: none;
+  margin: 2px; 
+}
+
+.Treant .node.collapsed > .collapse-switch {
+  background-color: initial;
+}
+
+.node > .collapse-switch::before {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  color: #bd7318;
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  position: absolute;
+  top: 0px;
+}
+
+.node:not(.collapsed) > .collapse-switch::before {
+  content: "\f077";
+}
+
+.node.collapsed > .collapse-switch::before {
+  content: "\f078";
+}
+
+.action::before {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  color: #bd7318;
+  display: inline-block;
+  font-style: normal;
+  font-variant: normal;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+.icon-move::before {
+  content: "\f6de";
+}
+
+.icon-switch::before {
+  content: "\f362";
+}
+
+.player {
+  position: absolute;
+  top: -5px;
+  left: -5px;
+}
+
+.percymon-badge {
+  color: #212529;
+  background-color: #ffc107;
+  display: none;
+}
+
+.player-badge {
+  color: #fff;
+  background-color: #28a745;
+  display: none;
+}
+
+.node > p.node-name {
+  display: none;
+}
+
+.action {
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.special-action-badge {
+  text-align: center;
+}
+
+.value {
+  text-align: center;
+  position: relative;
+  top: -40px;
+  left: 8px;
+  margin-bottom: -30px;
+}
+
+.value-text {
+  font-size: 20px;
+  width: 10px;
+  border-radius: 58px;
+  color: white;
+  background-color: #bd7318;
+  padding: 5px;
+}
+
+.custom-node {
+  padding-top: 10px;
+  width: 150px;
+}
+
+body > .custom-node {
+  display: none;
+}
+
+.megaevo-badge {
+  color: whitesmoke;
+  background-color: lightslategray;
+  display: none;
+}
+
+.zmove-badge {
+  color: #f5f4e8;
+  background-color: #d09d04;
+  display: none;
+}
+
+.dynamax-badge {
+  color: lightpink;
+  background-color: purple;
+  display: none;
+}

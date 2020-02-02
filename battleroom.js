@@ -15,37 +15,35 @@ var logger = require('log4js').getLogger("battleroom");
 var decisionslogger = require('log4js').getLogger("decisions");
 
 //battle-engine
-var Battle = require('./battle-engine/battle-engine').Battle;
-var BattlePokemon = require('./battle-engine/battle-engine').BattlePokemon;
+var PcmBattle = require('./percymon-battle-engine').PcmBattle;
+var PcmPokemon = require('./percymon-battle-engine').PcmPokemon;
 
-var Abilities = require("./data/abilities").BattleAbilities;
-var Items = require("./data/items").BattleItems;
+var Abilities = require("./showdown-sources/data/abilities").BattleAbilities;
+var Items = require("./showdown-sources/data/items").BattleItems;
 
 var _ = require("underscore");
 
-var clone = require("./clone");
+const cloneBattle = require('./util').cloneBattle;
+
+const terrainMoves = new Map();
+terrainMoves.set('Electric Terrain', ['Electric Terrain', 'Z-Electric Terrain', 'Max Lightning']);
+terrainMoves.set('Grassy Terrain', ['Grassy Terrain', 'Z-Grassy Terrain', 'Max Overgrowth']);
+terrainMoves.set('Psychic Terrain', ['Psychic Terrain', 'Z-Psychic Terrain', 'Max Mindstorm']);
+terrainMoves.set('Misty Terrain', ['Misty Terrain', 'Z-Misty Terrain', 'Max Starfall']);
+
+const weatherMoves = new Map();
+weatherMoves.set('SunnyDay', ['Sunny Day', 'Z-Sunny Day', 'Max Flare']);
+weatherMoves.set('RainDance', ['Rain Dance', 'Z-Rain Dance', 'Max Geyser']);
+weatherMoves.set('Sandstorm', ['Sandstorm', 'Z-Sandstorm', 'Max Rockfall']);
+weatherMoves.set('Hail', ['Hail', 'Z-Hail', 'Max Hailstorm']);
 
 var BattleRoom = new JS.Class({
-    initialize: function(id, sendfunc) {
+    initialize: function(id, sendfunc, formatId, team) {
         this.id = id;
         this.title = "Untitled";
         this.send = sendfunc;
-
-        // Construct a battle object that we will modify as our state
-        this.state = require('./battle-engine/battle-engine').construct('base', false, null);
-        // Default team is automatically filled by 6 Bulbasaur
-        // In our local simulation in the future, Bulbasaur means unknown and temporary slot
-        const team1 = [];
-        const team2 = [];
-        for (let i = 0; i < 6; i++) {
-            team1.push(Tools.getTemplate('Bulbasaur'));
-            team2.push(Tools.getTemplate('Bulbasaur'));
-        }
-        this.state.join('p1', 'botPlayer', 1, team1); // We will be player 1 in our local simulation
-        this.state.join('p2', 'humanPlayer', 1, team2);
-        this.state.reportPercentages = true;
-
-        this.previousState = null; // For TD Learning
+        this.formatId = formatId;
+        this.team = team;
 
         setTimeout(function() {
             sendfunc(global.account.message, id); // Notify User that this is a bot
@@ -54,9 +52,20 @@ var BattleRoom = new JS.Class({
 
         this.decisions = [];
         this.teamPreviewRequest = {}; // my team information
+        this.teamPreviewSelection = []; // pokemon indices used in team preview (1 ~ 6)
+        this.afterBattleStarted = [() => {}];
         this.log = "";
 
-        this.state.start();
+        let mod = 'gen8'; // latest gen as a default
+        if (this.formatId.substring(0, 3) === 'gen') {
+            mod = this.formatId.substring(0, 4);
+        }
+        this.customGameFormat = Dex.getFormat(`${mod}customgame`, true);
+        this.customGameFormat.ruleset = this.customGameFormat.ruleset.filter(rule => rule !== 'Team Preview');
+        this.dexForFormat = Dex.forFormat(this.customGameFormat);
+
+        this.p1DynamaxUsed = false;
+        this.p2DynamaxUsed = false;
     },
     init: function(data) {
         var log = data.split('\n');
@@ -68,6 +77,46 @@ var BattleRoom = new JS.Class({
             log.shift();
             logger.info("Title for " + this.id + " is " + this.title);
         }
+    },
+    startBattle: function() {
+        // Default team is automatically filled by 6 Bulbasaur
+        // In our local simulation in the future, Bulbasaur means unknown and temporary slot
+        let team1 = [];
+        const team2 = [];
+        for (let i = 0; i < 6; i++) {
+            const bulbasaur1 = this.dexForFormat.getTemplate('Bulbasaur');
+            bulbasaur1.moves = [];
+            bulbasaur1.level = 1;
+            team1.push(bulbasaur1);
+            const bulbasaur2 = this.dexForFormat.getTemplate('Bulbasaur');
+            bulbasaur2.moves = [];
+            bulbasaur2.level = 1;
+            team2.push(bulbasaur2);
+        }
+
+        if (this.team && this.teamPreviewSelection) {
+            team1 = [];
+            const pokemonSets = this.dexForFormat.fastUnpackTeam(this.team);
+            this.teamPreviewSelection.forEach(pokeIndex => {
+                team1.push(pokemonSets[pokeIndex - 1]);
+            })
+        }
+
+        const p1 = { name: 'botPlayer', avatar: 1, team: team1 };
+        const p2 = { name: 'humanPlayer', avatar: 1, team: team2 };
+
+        // Construct a battle object that we will modify as our state
+        const battleOptions = { format: this.customGameFormat, rated: false, send: null, p1, p2 };
+        this.state = new PcmBattle(battleOptions);
+        this.state.reportPercentages = true;
+
+        this.previousState = null; // For TD Learning
+
+        this.state.start();
+        this.afterBattleStarted.forEach(callback => {
+            callback();
+        });
+        this.afterBattleStarted = [() => {}];
     },
     //given a player and a pokemon, returns the corresponding pokemon object
     getPokemon: function(battleside, pokename) {
@@ -101,43 +150,46 @@ var BattleRoom = new JS.Class({
     },
     // TODO: Understand more about the opposing pokemon
     updatePokemonOnSwitch: function(tokens) {
-        var tokens2 = tokens[2].split(' ');
+        const speciesName = tokens[3].split(', ')[0];
         var level = tokens[3].split(', ')[1].substring(1);
         var tokens4 = tokens[4].split(/\/| /); //for health
 
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        const player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        const nickName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var health = tokens4[0];
         var maxHealth = tokens4[1];
 
         var battleside = undefined;
+        let canPlayerDynamax = true;
 
         if (this.isPlayer(player)) {
             logger.info("Our pokemon has switched! " + tokens[2]);
             battleside = this.state.p1;
             //remove boosts for current pokemon
             this.state.p1.active[0].clearVolatile();
+            canPlayerDynamax = !this.p1DynamaxUsed;
         } else {
             logger.info("Opponents pokemon has switched! " + tokens[2]);
             battleside = this.state.p2;
             //remove boosts for current pokemon
             this.state.p2.active[0].clearVolatile();
+            canPlayerDynamax = !this.p2DynamaxUsed;
         }
-        var pokemon = this.getPokemon(battleside, pokeName);
+        var pokemon = this.getPokemon(battleside, nickName);
 
         if(!pokemon) { //pokemon has not been defined yet, so choose Bulbasaur
             //note: this will not quite work if the pokemon is actually Bulbasaur
             pokemon = this.getPokemon(battleside, "Bulbasaur");
-            var set = this.state.getTemplate(pokeName);
+            var set = this.state.dex.getTemplate(speciesName);
             set.moves = set.randomBattleMoves;
             //set.moves = _.sample(set.randomBattleMoves, 4); //for efficiency, need to implement move ordering
             set.level = parseInt(level);
             //choose the best ability
             var abilities = Object.values(set.abilities).sort(function(a,b) {
-                return this.state.getAbility(b).rating - this.state.getAbility(a).rating;
+                return this.dexForFormat.getAbility(b).rating - this.dexForFormat.getAbility(a).rating;
             }.bind(this));
             set.ability = abilities[0];
-            pokemon = new BattlePokemon(set, battleside);
+            pokemon = new PcmPokemon(set, battleside);
             pokemon.trueMoves = []; //gradually add moves as they are seen
         }
         //opponent hp is recorded as percentage
@@ -146,17 +198,22 @@ var BattleRoom = new JS.Class({
 
         battleside.active[0].isActive = false;
         pokemon.isActive = true;
+        if (pokemon.canDynamax && !canPlayerDynamax) {
+            pokemon.canDynamax = false;
+        }
         this.updatePokemon(battleside,pokemon);
 
         battleside.active = [pokemon];
 
         //Ensure that active pokemon is in slot zero
         battleside.pokemon = _.sortBy(battleside.pokemon, function(pokemon) { return pokemon == battleside.active[0] ? 0 : 1 });
+        for (let i = 0; i < battleside.pokemon.length; i++) {
+            battleside.pokemon[i].position = i;
+        }
     },
     updatePokemonOnMove: function(tokens) {
-        var tokens2 = tokens[2].split(' ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var move = tokens[3];
         var battleside = undefined;
 
@@ -196,14 +253,14 @@ var BattleRoom = new JS.Class({
                     logger.info("Collected all of " + pokeName + "'s moves!");
                     var newMoves = [];
                     var newMoveset = [];
-                    for(var i = 0; i < pokemon.moveset.length; i++) {
-                        if(pokemon.trueMoves.indexOf(pokemon.moveset[i].id) >= 0) {
-                            newMoves.push(pokemon.moveset[i].id); //store id
-                            newMoveset.push(pokemon.moveset[i]);  //store actual moves
+                    for(var i = 0; i < pokemon.moveSlots.length; i++) {
+                        if(pokemon.trueMoves.indexOf(pokemon.moveSlots[i].id) >= 0) {
+                            newMoves.push(pokemon.moveSlots[i].id); //store id
+                            newMoveset.push(pokemon.moveSlots[i]);  //store actual moves
                         }
                     }
                     pokemon.moves = newMoves;
-                    pokemon.moveset = newMoveset;
+                    pokemon.moveSlots = newMoveset;
                 }
 
             }
@@ -211,16 +268,16 @@ var BattleRoom = new JS.Class({
 
         this.updatePokemon(battleside, pokemon);
 
+        return { move: move, pokemon: pokemon};
     },
     updatePokemonOnDamage: function(tokens) {
         //extract damage dealt to a particular pokemon
         //also takes into account passives
         //note that opponent health is recorded as percent. Keep this in mind
 
-        var tokens2 = tokens[2].split(' ');
         var tokens3 = tokens[3].split(/\/| /);
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var health = tokens3[0];
         var maxHealth = tokens3[1];
         var battleside = undefined;
@@ -245,11 +302,10 @@ var BattleRoom = new JS.Class({
 
     },
     updatePokemonOnBoost: function(tokens, isBoost) {
-        var tokens2 = tokens[2].split(' ');
         var stat = tokens[3];
         var boostCount = parseInt(tokens[4]);
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var battleside = undefined;
 
         if(this.isPlayer(player)) {
@@ -278,11 +334,10 @@ var BattleRoom = new JS.Class({
         this.updatePokemon(battleside, pokemon);
     },
     updatePokemonSetBoost: function(tokens) {
-        var tokens2 = tokens[2].split(' ');
         var stat = tokens[3];
         var boostCount = parseInt(tokens[4]);
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var battleside = undefined;
 
         if(this.isPlayer(player)) {
@@ -301,9 +356,8 @@ var BattleRoom = new JS.Class({
         this.updatePokemon(battleside, pokemon);
     },
     updatePokemonRestoreBoost: function(tokens) {
-        var tokens2 = tokens[2].split(' ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var battleside = undefined;
 
         if(this.isPlayer(player)) {
@@ -331,9 +385,8 @@ var BattleRoom = new JS.Class({
         //move: yawn, etc.
         //ability: flash fire, etc.
 
-        var tokens2 = tokens[2].split(' ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var status = tokens[3];
         var battleside = undefined;
 
@@ -353,35 +406,175 @@ var BattleRoom = new JS.Class({
 
         if(newStatus) {
             pokemon.addVolatile(status);
+            if (status === 'Dynamax') {
+                battleside.pokemon.forEach(poke => poke.canDynamax = false);
+                if (this.isPlayer(player)) {
+                    this.p1DynamaxUsed = true;
+                } else {
+                    this.p2DynamaxUsed = true;
+                }
+            }
         } else {
             pokemon.removeVolatile(status);
         }
         this.updatePokemon(battleside, pokemon);
     },
-    updateField: function(tokens, newField) {
-        //as far as I know, only applies to trick room, which is a pseudo-weather
+    updateField: function(tokens, newField, pokesUsedMoves) {
         var fieldStatus = tokens[2].substring(6);
-        if(newField) {
-            this.state.addPseudoWeather(fieldStatus);
+
+        // terrain or pseudoweather
+        let isTerrain = false;
+        for (let key of terrainMoves.keys()) {
+            if (fieldStatus.indexOf(key) >= 0) {
+                isTerrain = true;
+                break;
+            }
+        }
+
+        let source = null;
+        if (this.isUpkeepMessage(tokens)) {
+            return;
+        }
+        if (!source) {
+            source = this.getSourcePokemonFromOf(tokens);
+        }
+        if (!source && !isTerrain) {
+            source = this.getSourcePokemonFromMoveName(fieldStatus, pokesUsedMoves);
+        }
+        if (!source && isTerrain) {
+            source = this.getSourcePokemonFromTerrainMoves(fieldStatus, pokesUsedMoves)
+        }
+
+        if (isTerrain) {
+            if (newField) {
+                this.state.field.setTerrain(fieldStatus, source);
+            } else {
+                this.state.field.clearTerrain();
+            }
         } else {
-            this.state.removePseudoWeather(fieldStatus);
+            if(newField) {
+                this.state.field.addPseudoWeather(fieldStatus, source);
+            } else {
+                this.state.field.removePseudoWeather(fieldStatus);
+            }    
         }
     },
-    updateWeather: function(tokens) {
+    isUpkeepMessage(tokens) {
+        return tokens.length > 3 && tokens[3].indexOf('[upkeep]') >= 0;
+    },
+    getSourcePokemonFromOf(tokens) {
+        let pokeName = '';
+        let source = null;
+        tokens.forEach(token => {
+            if (token.indexOf('[of]') >= 0) {
+                pokeName = token.slice(token.lastIndexOf(':') + 2);
+            }
+        })
+
+        this.state.p1.pokemon.forEach(poke => {
+            if (poke.name === pokeName || poke.species === pokeName) {
+                source = poke;
+            }
+        });
+        this.state.p2.pokemon.forEach(poke => {
+            if (poke.name === pokeName || poke.species === pokeName) {
+                source = poke;
+            }
+        });
+        
+        return source;
+    },
+    getSourcePokemonFromMoveName(fieldStatus, pokesUsedMoves) {
+        let source = null;
+
+        if(fieldStatus.substring(0,4) === "move") {
+            fieldStatus = tokens[3].substring(6);
+        }
+        const poke = pokesUsedMoves.get(fieldStatus);
+        if (poke) {
+            source = poke;
+        }
+
+        return source;
+    },
+    getSourcePokemonFromTerrainMoves(fieldStatus, pokesUsedMoves) {
+        let terrain = null
+        for (let key of terrainMoves.keys()) {
+            if (fieldStatus.indexOf(key) >= 0) {
+                terrain = key;
+            }
+        }
+
+        let moves = terrainMoves.get(terrain);
+        if (!moves) {
+            return null;
+        }
+
+        let source = null;
+        for (var [key, value] of pokesUsedMoves) {
+            if (moves.some(move => move.indexOf(key) >= 0)) {
+                source = value;
+                break;
+            }
+        }
+
+        return source;
+    },
+    getSourcePokemonFromWeatherMoves(fieldStatus, pokesUsedMoves) {
+        let weather = null
+        for (let key of weatherMoves.keys()) {
+            if (fieldStatus.indexOf(key) >= 0) {
+                weather = key;
+            }
+        }
+
+        let moves = weatherMoves.get(weather);
+        if (!moves) {
+            return null;
+        }
+
+        let source = null;
+        for (var [key, value] of pokesUsedMoves) {
+            if (moves.some(move => move.indexOf(key) >= 0)) {
+                source = value;
+                break;
+            }
+        }
+
+        return source;
+    },
+    updateWeather: function(tokens, pokesUsedMoves) {
         var weather = tokens[2];
         if(weather === "none") {
-            this.state.clearWeather();
+            this.state.field.clearWeather();
         } else {
-            this.state.setWeather(weather);
+            let source = null;
+
+            if (this.isUpkeepMessage(tokens)) {
+                return;
+            }
+            if (!source) {
+                source = this.getSourcePokemonFromOf(tokens);
+            }
+            if (!source) {
+                source = this.getSourcePokemonFromWeatherMoves(weather, pokesUsedMoves)
+            }
+
+            this.state.field.setWeather(weather, source);
             //we might want to keep track of how long the weather has been lasting...
             //might be done automatically for us
         }
     },
-    updateSideCondition: function(tokens, newSide) {
+    updateSideCondition: function(tokens, newSide, pokesUsedMoves) {
         var player = tokens[2].split(' ')[0];
-        var sideStatus = tokens[3];
-        if(sideStatus.substring(0,4) === "move")
+        var sideStatus = tokens[3]; // move: {movename} or {movename}
+        let source = null;
+        if(sideStatus.substring(0,4) === "move") {
             sideStatus = tokens[3].substring(6);
+        }
+
+        source = this.getSourcePokemonFromMoveName(sideStatus, pokesUsedMoves);
+
         var battleside = undefined;
         if(this.isPlayer(player)) {
             battleside = this.state.p1;
@@ -390,17 +583,16 @@ var BattleRoom = new JS.Class({
         }
 
         if(newSide) {
-            battleside.addSideCondition(sideStatus);
+            battleside.addSideCondition(sideStatus, source);
             //Note: can have multiple layers of toxic spikes or spikes
         } else {
-            battleside.removeSideCondition(sideStatus);
+            battleside.removeSideCondition(sideStatus, source);
             //remove side status
         }
     },
     updatePokemonStatus: function(tokens, newStatus) {
-        var tokens2 = tokens[2].split(' ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var status = tokens[3];
         var battleside = undefined;
 
@@ -426,9 +618,8 @@ var BattleRoom = new JS.Class({
         //record that a pokemon has an item. Most relevant if a Pokemon has an air balloon/chesto berry
         //TODO: try to predict the opponent's current item
 
-        var tokens2 = tokens[2].split(' ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var item = tokens[3];
         var battleside = undefined;
 
@@ -449,10 +640,9 @@ var BattleRoom = new JS.Class({
 
     //Apply mega evolution effects, or aegislash/meloetta
     updatePokemonOnFormeChange: function(tokens) {
-        var tokens2 = tokens[2].split(' ');
         var tokens3 = tokens[3].split(', ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var newPokeName = tokens3[0];
         var battleside = undefined;
 
@@ -480,10 +670,9 @@ var BattleRoom = new JS.Class({
     },
     //for ditto exclusively
     updatePokemonOnTransform: function(tokens) {
-        var tokens2 = tokens[2].split(' ');
         var tokens3 = tokens[3].split(' ');
-        var player = tokens2[0];
-        var pokeName = tokens2[1];
+        var player = tokens[2].substring(0, tokens[2].indexOf(' '));
+        var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var newPokeName = tokens3[1];
         var battleside = undefined;
         var pokemon = undefined;
@@ -514,6 +703,7 @@ var BattleRoom = new JS.Class({
 
         var log = data.split('\n');
         const teamPreviewPokes = [];
+        const pokesUsedMoves = new Map();
         for (var i = 0; i < log.length; i++) {
             this.log += log[i] + "\n";
 
@@ -555,15 +745,17 @@ var BattleRoom = new JS.Class({
                         details: tokens[3],
                         hasItem: tokens.length === 5 && tokens[4] === 'item'
                     };
-                    // console.dir(poke);
                     teamPreviewPokes.push(poke);
                 } else if (tokens[1] ==='teampreview') {
                     const maxTeamSize = tokens[2];
-                    this.chooseTeamPokes(teamPreviewPokes);
+                    this.teamPreviewSelection = this.chooseTeamPokes(teamPreviewPokes, maxTeamSize);
+                } else if (tokens[1] ==='start') {
+                    this.startBattle();
                 } else if (tokens[1] === 'switch' || tokens[1] === 'drag') {
                     this.updatePokemonOnSwitch(tokens);
                 } else if (tokens[1] === 'move') {
-                    this.updatePokemonOnMove(tokens);
+                    const moveAndPoke = this.updatePokemonOnMove(tokens);
+                    pokesUsedMoves.set(moveAndPoke.move, moveAndPoke.pokemon);
                 } else if(tokens[1] === 'faint') { //we could outright remove a pokemon...
                     //record that pokemon has fainted
                 } else if(tokens[1] === 'detailschange' || tokens[1] === 'formechange') {
@@ -587,15 +779,15 @@ var BattleRoom = new JS.Class({
                 } else if(tokens[1] === '-end') {
                     this.updatePokemonStart(tokens, false);
                 } else if(tokens[1] === '-fieldstart') {
-                    this.updateField(tokens, true);
+                    this.updateField(tokens, true, pokesUsedMoves);
                 } else if(tokens[1] === '-fieldend') {
-                    this.updateField(tokens, false);
+                    this.updateField(tokens, false, pokesUsedMoves);
                 } else if(tokens[1] === '-weather') {
-                    this.updateWeather(tokens);
+                    this.updateWeather(tokens, pokesUsedMoves);
                 } else if(tokens[1] === '-sidestart') {
-                    this.updateSideCondition(tokens, true);
+                    this.updateSideCondition(tokens, true, pokesUsedMoves);
                 } else if(tokens[1] === '-sideend') {
-                    this.updateSideCondition(tokens, false);
+                    this.updateSideCondition(tokens, false, pokesUsedMoves);
                 } else if(tokens[1] === '-status') {
                     this.updatePokemonStatus(tokens, true);
                 } else if(tokens[1] === '-curestatus') {
@@ -662,6 +854,12 @@ var BattleRoom = new JS.Class({
             this.teamPreviewRequest = request;
             // team pokemon choice will be done with following messages
         } else {
+            // on starting a battle, the first request is arrived former than |start| message
+            if (!this.state) {
+                this.afterBattleStarted.push(() => this.receiveRequest(request));
+                return;
+            }
+
             if (request.side) this.updateSide(request.side, true);
     
             if (request.active) logger.info(this.title + ": I need to make a move.");
@@ -676,77 +874,80 @@ var BattleRoom = new JS.Class({
     updateSide: function(sideData) {
         if (!sideData || !sideData.id) return;
         logger.info("Starting to update my side data.");
-        for (var i = 0; i < sideData.pokemon.length; ++i) {
-            var pokemon = sideData.pokemon[i];
-
-            var details = pokemon.details.split(",");
-            var name = details[0].trim();
-            var level = parseInt(details[1].trim().substring(1));
-            var gender = details[2] ? details[2].trim() : null;
-
-            var templateFromSideData = {
-                name: name,
-                moves: pokemon.moves,
-                ability: Abilities[pokemon.baseAbility].name,
-                evs: {
-                    hp: 85,
-                    atk: 85,
-                    def: 85,
-                    spa: 85,
-                    spd: 85,
-                    spe: 85
-                },
-                ivs: {
-                    hp: 31,
-                    atk: 31,
-                    def: 31,
-                    spa: 31,
-                    spd: 31,
-                    spe: 31
-                },
-                item: (!pokemon.item || pokemon.item === '') ? '' : Items[pokemon.item].name,
-                level: level,
-                active: pokemon.active,
-                shiny: false
-            };
-
-            let template = this.state.getTemplate(name);
-            Object.assign(template, templateFromSideData);
-            
-            //keep track of old pokemon
-            var oldPokemon = this.state.p1.pokemon[i];
-
-            // Initialize pokemon
-            this.state.p1.pokemon[i] = new BattlePokemon(template, this.state.p1);
-            this.state.p1.pokemon[i].position = i;
-
-            // Update the pokemon object with latest stats
-            for (var stat in pokemon.stats) {
-                this.state.p1.pokemon[i].baseStats[stat] = pokemon.stats[stat];
+        // only for random team
+        if (!this.team) {
+            for (var i = 0; i < sideData.pokemon.length; ++i) {
+                var pokemon = sideData.pokemon[i];
+    
+                var details = pokemon.details.split(",");
+                var name = details[0].trim();
+                var level = parseInt(details[1].trim().substring(1));
+                var gender = details[2] ? details[2].trim() : null;
+    
+                var templateFromSideData = {
+                    name: name,
+                    moves: pokemon.moves,
+                    ability: Abilities[pokemon.baseAbility].name,
+                    evs: {
+                        hp: 85,
+                        atk: 85,
+                        def: 85,
+                        spa: 85,
+                        spd: 85,
+                        spe: 85
+                    },
+                    ivs: {
+                        hp: 31,
+                        atk: 31,
+                        def: 31,
+                        spa: 31,
+                        spd: 31,
+                        spe: 31
+                    },
+                    item: (!pokemon.item || pokemon.item === '') ? '' : Items[pokemon.item].name,
+                    level: level,
+                    active: pokemon.active,
+                    shiny: false
+                };
+    
+                let template = this.state.dex.getTemplate(name);
+                Object.assign(template, templateFromSideData);
+                
+                //keep track of old pokemon
+                var oldPokemon = this.state.p1.pokemon[i];
+    
+                // Initialize pokemon
+                this.state.p1.pokemon[i] = new PcmPokemon(template, this.state.p1);
+                this.state.p1.pokemon[i].position = i;
+    
+                // Update the pokemon object with latest stats
+                for (var stat in pokemon.stats) {
+                    this.state.p1.pokemon[i].baseStoredStats[stat] = pokemon.stats[stat];
+                }
+                // Update health/status effects, if any
+                var condition = pokemon.condition.split(/\/| /);
+                this.state.p1.pokemon[i].hp = parseInt(condition[0]);
+                if(condition.length > 2) {//add status condition
+                    this.state.p1.pokemon[i].setStatus(condition[2]); //necessary
+                }
+                if(oldPokemon.isActive && oldPokemon.statusData) { //keep old duration
+                    pokemon.statusData = oldPokemon.statusData;
+                }
+    
+                // Keep old boosts
+                this.state.p1.pokemon[i].boosts = oldPokemon.boosts;
+    
+                // Keep old volatiles
+                this.state.p1.pokemon[i].volatiles = oldPokemon.volatiles;
+    
+                if (pokemon.active) {
+                    this.state.p1.active = [this.state.p1.pokemon[i]];
+                    this.state.p1.pokemon[i].isActive = true;
+                }
+    
+                // TODO(rameshvarun): Somehow parse / load in current hp and status conditions
             }
-            // Update health/status effects, if any
-            var condition = pokemon.condition.split(/\/| /);
-            this.state.p1.pokemon[i].hp = parseInt(condition[0]);
-            if(condition.length > 2) {//add status condition
-                this.state.p1.pokemon[i].setStatus(condition[2]); //necessary
-            }
-            if(oldPokemon.isActive && oldPokemon.statusData) { //keep old duration
-                pokemon.statusData = oldPokemon.statusData;
-            }
-
-            // Keep old boosts
-            this.state.p1.pokemon[i].boosts = oldPokemon.boosts;
-
-            // Keep old volatiles
-            this.state.p1.pokemon[i].volatiles = oldPokemon.volatiles;
-
-            if (pokemon.active) {
-                this.state.p1.active = [this.state.p1.pokemon[i]];
-                this.state.p1.pokemon[i].isActive = true;
-            }
-
-            // TODO(rameshvarun): Somehow parse / load in current hp and status conditions
-        }
+        } 
 
         // Set canMegaEvo flag manually
         const hasAlreadyMegaEvo = this.state.p1.pokemon.some(poke => poke.species.indexOf("-Mega") > 0);
@@ -761,10 +962,8 @@ var BattleRoom = new JS.Class({
         this.oppSide = (this.side === "p1") ? "p2" : "p1";
         logger.info(this.title + ": My current side is " + this.side);
     },
-    chooseTeamPokes: function(pokes) {
+    chooseTeamPokes: function(pokes, maxTeamSize) {
         logger.info("Choose team pokemons...");
-        logger.debug(this.teamPreviewRequest);
-        console.dir(pokes);
         // temporary random selection
         // in the future, use some algorithms to decide which combination is strongest to oppenents
         let teamOrderNums = [1, 2, 3, 4, 5, 6];
@@ -775,207 +974,8 @@ var BattleRoom = new JS.Class({
             teamOrderNums[r] = tmp;
         }
 
-        const myTeam = [];
-        const oppTeam = [];
-        pokes.forEach(poke => {
-            const name = poke.details.split(',').slice(0, 1);
-            logger.debug("new poke " + name);
-            const newPoke = this.state.getTemplate(name.toString());
-            newPoke.moves = newPoke.randomBattleMoves;
-            newPoke.level = 50;
-            if (poke.side === 'p2') {
-                myTeam.push(newPoke);
-            } else {
-                oppTeam.push(newPoke);
-            }
-            // console.dir(newPoke);
-        })
-
-        const rank = this.searchTeamCombination(myTeam, oppTeam).map(pokeIndex => pokeIndex + 1);
-        for (let i = 5; i >= 0; i--) {
-            if(teamOrderNums[i] === rank[0] || teamOrderNums[i] === rank[1] || teamOrderNums[i] === rank[2]) {
-                teamOrderNums.splice(i, 1);
-            }
-        }
-        
-
-        this.send("/team " + rank.join('') + teamOrderNums.join('') + '|' + this.teamPreviewRequest.rqid, this.id);
-    },
-    searchTeamCombination: function(myTeam, oppTeam) {
-        logger.debug("start searching team combination")
-        const battleEngine = require('./battle-engine/battle-engine');
-        const evalValueTable = [];
-        myTeam.forEach(myPoke => {
-            const evalRecord = [];
-            oppTeam.forEach(oppPoke => {
-                logger.debug("evaluate about " + myPoke.name + " vs " + oppPoke.name);
-                const battle = battleEngine.construct('base', false, null);
-                battle.join('p1', 'Guest 1', 1, [myPoke]);
-                battle.join('p2', 'Guest 2', 1, [oppPoke]);
-                battle.start();              
-                battle.makeRequest();                   
-                const decision = BattleRoom.parseRequest(battle.p1.request);
-                const evalValue = minimaxbot.decide(clone(battle), decision.choices, false).tree.value;
-                logger.debug("evalValue: " + evalValue);
-                evalRecord.push(evalValue);
-                });
-            evalValueTable.push(evalRecord);
-        });
-
-        logger.debug("evaluation value table is below: ");
-        let tableHeader = '        ,';
-        oppTeam.forEach(oppPoke => {
-            tableHeader += oppPoke.name + ',';
-        });
-        console.log(tableHeader);
-        for (let i = 0; i < myTeam.length; i++) {
-            let tableRecord = '';
-            tableRecord += myTeam[i].name + ',';
-            evalValueTable[i].forEach(evalValue => {
-                tableRecord += evalValue + ',';
-            });
-            console.log(tableRecord);
-        }
-
-        let norms = evalValueTable.map(vector => {
-            let sum = 0;
-            vector.forEach(element =>{
-                sum += element;
-            })
-            return sum;
-        });
-
-        let normObjs = [];
-        for (let i = 0; i < 6; i++) {
-            normObjs.push({ index: i, norm: norms[i]});
-        }
-
-        normObjs.sort((a, b) => {
-            if (a.norm < b.norm) return 1;
-        });
-
-        normObjs.forEach(obj => {
-            console.log(obj.index + ': ' + obj.norm);
-        })
-
-        let selectedPokes = [];
-        selectedPokes.push(normObjs[0].index);
-        logger.debug("first of norm " + normObjs[0].index);
-
-        let currentVector = evalValueTable[normObjs[0].index];
-        while (selectedPokes.length < 3) {
-            let weakestSlot = this.minimumIndex(currentVector);
-            logger.debug("weakestslot " + weakestSlot);
-
-            let strongestPoke = -1;
-            let strongestValue = Number.MIN_SAFE_INTEGER;
-            for (let i = 0; i < 6; i++) {
-                if (selectedPokes.some((element, index, array) => {
-                    return element === i;
-                })) {
-                    continue;
-                }
-
-                if (strongestValue < evalValueTable[i][weakestSlot]) {
-                    strongestPoke = i;
-                    strongestValue = evalValueTable[i][weakestSlot];
-                }
-            }
-
-            logger.debug("strongestPoke " + strongestPoke);
-            logger.debug("strongestValue " + strongestValue);
-            selectedPokes.push(strongestPoke);
-            for (let i = 0; i < 6; i++) {
-                currentVector[i] += evalValueTable[strongestPoke][i];
-            }
-        }
-
-        return selectedPokes;
-
-
-        // let first = this.maximumIndex(norms);
-        // let maximumNorm = norms[0];
-        // for (let i = 0; i < evalValueTable.length; i++) {
-        //     if (maximumNorm < norms[i]) {
-        //         first = i;
-        //         maximumNorm = norms[i];
-        //     }
-        // }
-
-        // let unitMaximum = -1000000000000;
-        // let unitMaxIndex = -1;
-        // for (let i = 0; i < 6; i++) {
-        //     let thisNorm = 0;
-        //     evalValueTable[i].forEach(val =>{
-        //         thisNorm += val;
-        //     })
-        //     if (unitMaximum < thisNorm)
-        //     {
-        //         unitMaximum = thisNorm;
-        //         unitMaxIndex = i;
-        //     }
-        // }
-
-        // let unitSecondIndex = -1;
-        // unitMaximum = -1000000000000;
-        // for (let i = 0; i < 6; i++) {
-        //     if(i === unitMaxIndex){
-        //         continue;
-        //     }
-        //     let thisNorm = 0;
-        //     evalValueTable[i].forEach(val =>{
-        //         thisNorm += val;
-        //     })
-        //     if (unitMaximum < thisNorm)
-        //     {
-        //         unitMaximum = thisNorm;
-        //         unitMaxIndex = i;
-        //     }
-        // }
-       
-        // let unitThirdIndex = -1;
-        // unitMaximum = -1000000000000;
-        // for (let i = 0; i < 6; i++) {
-        //     if(i === unitMaxIndex || i === unitSecondIndex){
-        //         continue;
-        //     }
-        //     let thisNorm = 0;
-        //     evalValueTable[i].forEach(val =>{
-        //         thisNorm += val;
-        //     })
-        //     if (unitMaximum < thisNorm)
-        //     {
-        //         unitMaximum = thisNorm;
-        //         unitMaxIndex = i;
-        //     }
-        // }
-
-        // logger.debug(unitMaxIndex + unitSecondIndex + unitThirdIndex);
-        // return [unitMaxIndex, unitSecondIndex, unitThirdIndex];
-    },
-    maximumIndex: function(norms) {
-        let first = 0;
-        let maximumNorm = norms[0];
-        for (let i = 0; i < norms.length; i++) {
-            if (maximumNorm < norms[i]) {
-                first = i;
-                maximumNorm = norms[i];
-            }
-        }
-
-        return first;
-    },
-    minimumIndex: function(norms) {
-        let first = 0;
-        let minimumNorm = norms[0];
-        for (let i = 0; i < norms.length; i++) {
-            if (minimumNorm > norms[i]) {
-                first = i;
-                minimumNorm = norms[i];
-            }
-        }
-
-        return first;
+        this.send("/team " + teamOrderNums.join('') + '|' + this.teamPreviewRequest.rqid, this.id);
+        return teamOrderNums.slice(0, maxTeamSize);
     },
     makeMove: function(request) {
         var room = this;
@@ -986,7 +986,7 @@ var BattleRoom = new JS.Class({
            
             if(program.net === "update") {
                 if(room.previousState != null) minimaxbot.train_net(room.previousState, room.state);
-                room.previousState = clone(room.state);
+                room.previousState = cloneBattle(room.state);
             }
 
             var decision = BattleRoom.parseRequest(request);
@@ -994,9 +994,9 @@ var BattleRoom = new JS.Class({
             // Use specified algorithm to determine resulting choice
             var result = undefined;
             if(decision.choices.length == 1) result = decision.choices[0];
-            else if(program.algorithm === "minimax") result = minimaxbot.decide(clone(room.state), decision.choices);
-            else if(program.algorithm === "greedy") result = greedybot.decide(clone(room.state), decision.choices);
-            else if(program.algorithm === "random") result = randombot.decide(clone(room.state), decision.choices);
+            else if(program.algorithm === "minimax") result = minimaxbot.decide(cloneBattle(room.state), decision.choices, true, program.depth);
+            else if(program.algorithm === "greedy") result = greedybot.decide(cloneBattle(room.state), decision.choices);
+            else if(program.algorithm === "random") result = randombot.decide(cloneBattle(room.state), decision.choices);
 
             room.decisions.push(result);
             room.send("/choose " + BattleRoom.toChoiceString(result, room.state.p1) + "|" + decision.rqid, room.id);
@@ -1006,8 +1006,12 @@ var BattleRoom = new JS.Class({
     extend: {
         toChoiceString: function(choice, battleside) {
             if (choice.type == "move") {
-                if(battleside && battleside.active[0].canMegaEvo) //mega evolve if possible
+                if (choice.runMegaEvo)
                     return "move " + choice.id + " mega";
+                else if (choice.useZMove)
+                    return "move " + choice.id + " zmove";
+                else if (choice.runDynamax)
+                    return "move " + choice.id + " dynamax";                    
                 else
                     return "move " + choice.id;
             } else if (choice.type == "switch") {
@@ -1022,12 +1026,23 @@ var BattleRoom = new JS.Class({
 
             // If we can make a move
             if (request.active) {
-                _.each(request.active[0].moves, function(move) {
+                _.each(request.active[0].moves, function(move, index) {
                     if (!move.disabled) {
-                        choices.push({
+                        const choice = {
                             "type": "move",
-                            "id": move.id
-                        });
+                            "id": move.id,
+                        };
+                        choices.push(choice);
+
+                        if (request.active[0].canMegaEvo) {
+                            choices.push({...choice, "runMegaEvo": request.active[0].canMegaEvo})
+                        }
+                        if (request.active[0].canZMove && request.active[0].canZMove[index]) {
+                            choices.push({...choice, "useZMove": true})
+                        }
+                        if (request.active[0].canDynamax) {
+                            choices.push({...choice, "runDynamax": true})
+                        }
                     }
                 });
             }

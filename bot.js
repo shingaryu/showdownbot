@@ -7,11 +7,16 @@ global.program
 	.option('--ranked', 'Challenge on the ranked league.')
 	.option('--net [action]', "'create' - generate a new network. 'update' - use and modify existing network. 'use' - use, but don't modify network. 'none' - use hardcoded weights. ['none']", 'none')
 	.option('--algorithm [algorithm]', "Can be 'minimax', 'greedy', or 'random'. ['minimax']", "minimax")
+	.option('--depth [depth]', "Minimax bot searches to this depth from the current state. [2]", "2")
 	.option('--account [file]', "File from which to load credentials. ['account.json']", "account.json")
-	.option('--team [file]', "File from which to load a battle team. ['team.txt']", "team.txt")
+	.option('--team6g [file]', "File from which to load a battle team for Gen 6. ['team6g.txt']", "team6g.txt")
+	.option('--team7g [file]', "File from which to load a battle team for Gen 7. ['team7g.txt']", "team7g.txt")
+	.option('--team8g [file]', "File from which to load a battle team for Gen 8. ['team8g.txt']", "team8g.txt")
 	.option('--nosave', "Don't save games to the in-memory db.")
 	.option('--nolog', "Don't append to log files.")
-        .option('--startchallenging', "Start out challenging, instead of requiring a manual activation first.")
+	.option('--onlyinfo', "Hide debug messages and speed up bot calculations")
+	.option('--startchallenging', "Start out challenging, instead of requiring a manual activation first.")
+	.option('--usechildprocess', "Use child process to execute heavy calculations with parent process keeping the connection to showdown server.")
 	.parse(process.argv);
 
 var request = require('request'); // Used for making post requests to login server
@@ -19,50 +24,23 @@ var util = require('./util');
 var fs = require('fs');
 
 // Setup Logging
-var log4js = require('log4js');
-log4js.loadAppender('file');
+require('./initLog4js')(global.program.nolog, global.program.onlyinfo);
 var logger = require('log4js').getLogger("bot");
-
-if(!global.program.nolog) {
-	// Ensure that logging directory exists
-	if(!fs.existsSync("./logs")) { fs.mkdirSync("logs") };
-
-	log4js.addAppender(log4js.appenders.file('logs/bot.log'), 'bot');
-
-	log4js.addAppender(log4js.appenders.file('logs/minimax.log'), 'minimax');
-	log4js.addAppender(log4js.appenders.file('logs/learning.log'), 'learning');
-
-	log4js.addAppender(log4js.appenders.file('logs/battleroom.log'), 'battleroom');
-	log4js.addAppender(log4js.appenders.file('logs/decisions.log'), 'decisions');
-
-	log4js.addAppender(log4js.appenders.file('logs/webconsole.log'), 'webconsole');
-
-	log4js.addAppender(log4js.appenders.file('logs/battle.log'), 'battle');
-	log4js.addAppender(log4js.appenders.file('logs/battlepokemon.log'), 'battlepokemon');
-	log4js.addAppender(log4js.appenders.file('logs/battleside.log'), 'battleside');
-
-	log4js.addAppender(log4js.appenders.file('logs/greedy.log'), 'greedy');
-} else {
-	logger.setLevel("INFO");
-	log4js.configure({
-		appenders : [
-			{
-				type: "console",
-				category: ["bot"]
-			}
-		]
-	});
-}
 
 // Login information for this bot
 global.account = JSON.parse(fs.readFileSync(global.program.account));
 
-// Battle team for this bot
-const teamText = fs.readFileSync(global.program.team, "utf8")
-logger.debug(teamText);
-global.team = require('./tools').importTeam(teamText);
+// Global variables for simulator
+global.Dex = require('./showdown-sources/.sim-dist/dex').Dex;
+global.toId = Dex.getId;
 
-var webconsole = require("./console.js");// Web console
+// Battle teams for this bot
+const teamText6g = fs.readFileSync(global.program.team6g, "utf8")
+global.team6g = require('./util').importTeam(teamText6g);
+const teamText7g = fs.readFileSync(global.program.team7g, "utf8")
+global.team7g = require('./util').importTeam(teamText7g);
+const teamText8g = fs.readFileSync(global.program.team8g, "utf8")
+global.team8g = require('./util').importTeam(teamText8g);
 
 // Connect to server
 var sockjs = require('sockjs-client-ws');
@@ -70,25 +48,14 @@ var client = null;
 if(!global.program.console) client = sockjs.create(global.program.host);
 
 // Domain (replay button redirects here)
-var DOMAIN = "http://play.pokemonshowdown.com/";
-exports.DOMAIN = DOMAIN;
+global.DOMAIN = "http://play.pokemonshowdown.com/";
 
 // PHP endpoint used to login / authenticate
-var ACTION_PHP = DOMAIN + "~~showdown/action.php";
+var ACTION_PHP = global.DOMAIN + "~~showdown/action.php";
 
 // Values that need to be globally stored in order to login properly
 var CHALLENGE_KEY_ID = null;
 var CHALLENGE = null;
-
-// BattleRoom object
-var BattleRoom = require('./battleroom');
-
-// The game type that we want to search for on startup
-var GAME_TYPE = (global.program.ranked) ? "randombattle" : "unratedrandombattle";
-
-// Load in Game Data
-var Pokedex = require("./data/pokedex");
-var Typechart = require("./data/typechart");
 
 // Sends a piece of data to the given room
 // Room can be null for a global command
@@ -128,14 +95,22 @@ function rename(name, password) {
 	});
 }
 
-// When you debug, you cannot use child process 
-// const useChildProcess = true;
-const useChildProcess = false;
+const useChildProcess = global.program.usechildprocess;
 
 let roomHanderProcess;
 if (useChildProcess) {
 	logger.info("Fork child process of room handler...");
-	roomHanderProcess = require('child_process').fork('./roomhandler', [JSON.stringify(global.account), JSON.stringify(global.program)]);
+	roomHanderProcess = require('child_process').fork(
+		'./roomhandler', [
+			JSON.stringify(global.program),
+			JSON.stringify(global.account), 
+			JSON.stringify(global.DOMAIN),
+			JSON.stringify(global.team6g),
+			JSON.stringify(global.team7g),
+			JSON.stringify(global.team8g),
+		], 
+		{ execArgv : ['--inspect=9230'] } // fixed debug port for child process
+	);
 } else {
 	logger.info("Import room handler as parent process...");
 	require('./roomhandler');
@@ -173,34 +148,4 @@ if(client) {
 	client.on('error', function(e) {
 		logger.error(e);
 	});
-}
-
-// onevsonetest();
-
-function onevsonetest () {
-let minimaxbot = require("./bots/minimaxbot");
-let clone = require("./clone");
-
-logger.debug("1 vs 1 test");
-battle = require('./battle-engine/battle-engine').construct('base', false, null);
-const poke1 = battle.getTemplate("Raikou");
-poke1.moves = poke1.randomBattleMoves;
-poke1.level = 50;
-const poke2 = battle.getTemplate("Tyranitar");
-poke2.moves = poke2.randomBattleMoves;
-poke2.level = 50;
-battle.join('p1', 'Guest 1', 1, [poke1]);
-battle.join('p2', 'Guest 2', 1, [poke2]);
-battle.start();
-logger.debug("pokemons created");
-console.dir(poke1);
-console.dir(poke2);
-
-battle.makeRequest();    
-console.dir("request:: " + battle.p1.request[0]);
-
-const decision = BattleRoom.parseRequest(battle.p1.request);
-console.dir("decision " +  decision[0]);
-const result = minimaxbot.decide(clone(battle), decision.choices);
-console.dir(result);
 }

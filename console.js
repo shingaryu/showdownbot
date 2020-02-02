@@ -1,8 +1,9 @@
 var express = require('express');
 var app = express();
 var nunjucks = require('nunjucks');
-var bot = require('./bot')
-var program = require('commander'); // Get Command-line arguments
+const ROOMS = require('./roomhandler').ROOMS;
+const searchBattle = require('./roomhandler').searchBattle;
+const send = require('./roomhandler').send;
 
 // Results database
 var db = require("./db");
@@ -21,11 +22,13 @@ var minimaxbot = require("./bots/minimaxbot");
 // Challenging logic
 var MAX_ROOMS = 1;
 setInterval(function() {
-	if(CHALLENGING && _.values(bot.ROOMS).length < MAX_ROOMS) {
+	if(CHALLENGING && _.values(ROOMS).length < MAX_ROOMS) {
 		logger.info("Challenging...");
-		bot.searchBattle();
+		searchBattle();
 	}
 }, 45000);
+
+app.use( express.static('templates/decision-tree'));
 
 nunjucks.configure('templates', {
 	autoescape: true,
@@ -36,8 +39,8 @@ nunjucks.configure('templates', {
 app.get('/', function(req, res){
 	db.find({}).sort({ date: -1}).exec(function(err, history) {
 		res.render('home.html', {
-			"games" : _.values(bot.ROOMS),
-			"domain" : bot.DOMAIN,
+			"games" : _.values(ROOMS),
+			"domain" : global.DOMAIN,
 			"history" : history,
 			"challenging" : CHALLENGING
 		});
@@ -46,7 +49,7 @@ app.get('/', function(req, res){
 
 // Challenge a specific user
 app.get('/challenge', function(req, res){
-	bot.send("/challenge " + req.query.user + ", randombattle", null);
+	send("/challenge " + req.query.user + ", randombattle", null);
 	res.redirect("/");
 });
 
@@ -70,13 +73,25 @@ app.get('/endchallenging', function(req, res){
 });
 
 app.get('/room', function(req, res){
-	if(bot.ROOMS[req.query.id]) {
+	if(ROOMS[req.query.id]) {
 		res.render("room.html", {
-			game: bot.ROOMS[req.query.id],
+			game: ROOMS[req.query.id],
 			stringify : JSON.stringify,
 			format: function(str) {
 				return str.replace(/\n/g, "<br>").replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;");
 			}
+		});
+	} else {
+		res.redirect("/");
+	}	
+});
+
+app.get('/decision-tree', function(req, res){
+	if(ROOMS[req.query.id]) {
+		res.render("decision-tree/decisions-tree.html", {
+			// decisions: ROOMS[req.query.id].decisions,
+			game: ROOMS[req.query.id],
+			stringify : JSON.stringify,
 		});
 	} else {
 		res.redirect("/");
@@ -100,11 +115,11 @@ app.get('/replay', function(req, res){
 
 app.get('/search', function(req, res){
 	logger.debug("Asked to query from web console.");
-	bot.searchBattle();
+	searchBattle();
 	res.redirect("/");
 });
 
-var port = parseInt(program.port);
+var port = parseInt(global.program.port);
 app.listen(port);
 logger.info("Started web console on port " + port + "...");
 

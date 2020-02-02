@@ -3,3 +3,9 @@ account.json
 *.log
 *.db
 team.txt
+.vscode/
+# Typescript build artifacts
+showdown-sources/.*-dist/
+team7g.txt
+team6g.txt
+team8g.txt

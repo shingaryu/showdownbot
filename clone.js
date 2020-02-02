@@ -16,6 +16,12 @@ var util = {
   isRegExp: function (re) {
     return typeof re === 'object' && objectToString(re) === '[object RegExp]';
   },
+  isMap: function (m) {
+    return typeof m === 'object' && objectToString(m) === '[object Map]';
+  },
+  isSet: function (m) {
+    return typeof m === 'object' && objectToString(m) === '[object Set]';
+  },
   getRegExpFlags: function (re) {
     var flags = '';
     re.global && (flags += 'g');
@@ -87,6 +93,10 @@ function clone(parent, circular, depth, prototype) {
       child = new Buffer(parent.length);
       parent.copy(child);
       return child;
+    } else if (util.isMap(parent)) {
+      child = new Map();
+    } else if (util.isSet(parent)) {
+      child = new Set();
     } else {
       if (typeof prototype == 'undefined') {
         proto = Object.getPrototypeOf(parent);
@@ -108,8 +118,18 @@ function clone(parent, circular, depth, prototype) {
       parents.push(parent);
     }
 
-    for (var i in parent) {
-      if(parent.hasOwnProperty(i)) child[i] = _clone(parent[i], depth - 1);
+    if (util.isMap(parent)) {
+      for (var i of parent.keys()) {
+        child.set(i, _clone(parent.get(i), depth - 1));
+      }   
+    } else if (util.isMap(parent)) {
+      parent.forEach(item => {
+        child.add(_clone(item, depth - 1));
+      });
+    } else {
+      for (var i in parent) {
+        if(parent.hasOwnProperty(i)) child[i] = _clone(parent[i], depth - 1);
+      } 
     }
 
     return child;

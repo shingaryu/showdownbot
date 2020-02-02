@@ -7,7 +7,8 @@ var BattleRoom = require("./../battleroom");
 
 var randombot = require("./randombot");
 
-var Tools = require("./../tools");
+var Dex = require("../showdown-sources/.sim-dist/dex").Dex;
+const Battle = require("../showdown-sources/.sim-dist/dex").Dex;
 var damagingMoves = ["return", "grassknot", "lowkick", "gyroball", "heavyslam"];
 
 var switchPriority = module.exports.switchPriority = function(battle, pokemon, p1, p2) {
@@ -15,28 +16,28 @@ var switchPriority = module.exports.switchPriority = function(battle, pokemon, p
     var myPokemon = p1.pokemon[pokemon.id];
     //Incoming poke is immune to both of opponent Pokemon's types: 5
     if(_.all(oppPokemon.getTypes(), function(type) {
-        return !Tools.getImmunity(type, myPokemon.getTypes());
+        return !Dex.getImmunity(type, myPokemon.getTypes());
     })) {
         return 5;
     }
     //Incoming poke resists both of opponents' types: 4
     if(_.all(oppPokemon.getTypes(), function(type) {
-        return Tools.getEffectiveness(type, myPokemon) < 0 || !Tools.getImmunity(type, myPokemon.getTypes());
+        return Dex.getEffectiveness(type, myPokemon) < 0 || !Dex.getImmunity(type, myPokemon.getTypes());
     })) {
         return 4;
     }
     //Incoming poke receives neutral damage from opponent: 3
     if(_.all(oppPokemon.getTypes(), function(type) {
-        return Tools.getEffectiveness(type, myPokemon) <= 0 ||!Tools.getImmunity(type, myPokemon.getTypes());
+        return Dex.getEffectiveness(type, myPokemon) <= 0 ||!Dex.getImmunity(type, myPokemon.getTypes());
     })) {
         return 3;
     }
     //Incoming poke can deal super effective damage to opponents' pokemon: 2
     if(_.any(myPokemon.getMoves(), function(move) {
-        var moveData = Tools.getMove(move.id);
-        return Tools.getEffectiveness(moveData, oppPokemon) > 0 &&
+        var moveData = Dex.getMove(move.id);
+        return Dex.getEffectiveness(moveData, oppPokemon) > 0 &&
             (moveData.basePower > 0 || damagingMoves.indexOf(move.id) >= 0) &&
-            Tools.getImmunity(moveData.type, oppPokemon.getTypes());
+            Dex.getImmunity(moveData.type, oppPokemon.getTypes());
     })) {
         return 2;
     }
@@ -49,7 +50,7 @@ var movePriority = module.exports.movePriority = function(battle, move, p1, p2) 
     var myPokemon = p1.active[0];
     var oppPokemon = p2.active[0];
 
-    var moveData = Tools.getMove(move.id);
+    var moveData = Dex.getMove(move.id);
 
     //Light screen, reflect, or tailwind, and make sure they aren't already put up: 12
     var helpfulSideEffects = ["reflect","lightscreen","tailwind"];
@@ -75,40 +76,40 @@ var movePriority = module.exports.movePriority = function(battle, move, p1, p2) 
     }
 
     //Super effective move with STAB: 8
-    if(Tools.getEffectiveness(moveData, oppPokemon) > 0 &&
+    if(Dex.getEffectiveness(moveData, oppPokemon) > 0 &&
        (moveData.basePower > 0 || damagingMoves.indexOf(move.id) >= 0) &&
        myPokemon.getTypes().indexOf(moveData.type) >= 0 &&
-       Tools.getImmunity(moveData.type, oppPokemon.getTypes())) {
+       Dex.getImmunity(moveData.type, oppPokemon.getTypes())) {
         return 8;
     }
 
     //Super effective move with no STAB: 7
-    if(Tools.getEffectiveness(moveData, oppPokemon) > 0 &&
+    if(Dex.getEffectiveness(moveData, oppPokemon) > 0 &&
        (moveData.basePower > 0 || damagingMoves.indexOf(move.id) >= 0) &&
-       Tools.getImmunity(moveData.type, oppPokemon.getTypes())) {
+       Dex.getImmunity(moveData.type, oppPokemon.getTypes())) {
         return 7;
     }
 
     /*//If there is a super effective move, return 0 if there are good switches
     if(_.any(this.oppPokemon.getTypes(), function(oppType) {
-        return Tools.getEffectiveness(oppType, myPokemon.getTypes()) > 0 &&
-            Tools.getImmunity(oppType, myPokemon.getTypes());
+        return Dex.getEffectiveness(oppType, myPokemon.getTypes()) > 0 &&
+            Dex.getImmunity(oppType, myPokemon.getTypes());
     })) {
         return 0;
     }*/
 
     //Find move with STAB: 6
-    if(Tools.getEffectiveness(moveData, oppPokemon) === 0 &&
+    if(Dex.getEffectiveness(moveData, oppPokemon) === 0 &&
        (moveData.basePower > 0 || damagingMoves.indexOf(move.id) >= 0) &&
        myPokemon.getTypes().indexOf(moveData.type) >= 0 &&
-       Tools.getImmunity(moveData.type, oppPokemon.getTypes())) {
+       Dex.getImmunity(moveData.type, oppPokemon.getTypes())) {
         return 6;
     }
 
     //Find normally effective move: 1
-    if(Tools.getEffectiveness(moveData, oppPokemon) === 0 &&
+    if(Dex.getEffectiveness(moveData, oppPokemon) === 0 &&
        (moveData.basePower > 0 || damagingMoves.indexOf(move.id) >= 0) &&
-       Tools.getImmunity(moveData.type, oppPokemon.getTypes())) {
+       Dex.getImmunity(moveData.type, oppPokemon.getTypes())) {
         return 1;
     }
 

@@ -11,7 +11,7 @@ var BattleRoom = require("./../battleroom");
 var randombot = require("./randombot");
 var greedybot = require("./greedybot");
 
-var clone = require("./../clone");
+const cloneBattle = require('../util').cloneBattle;
 
 var convnetjs = require("convnetjs");
 
@@ -195,22 +195,22 @@ function getFeatures(battle) {
         if(_.contains(STATUSES, battle.p1.pokemon[i].status)) {
             ++features["p1_" + battle.p1.pokemon[i].status + "_count"];
             if(battle.p1.pokemon[i].status === "brn" && //weight burn and par differently
-               battle.p1.pokemon[i].baseStats.atk >= 180) {
+               battle.p1.pokemon[i].baseStoredStats.atk >= 180) {
                 ++features["p1_" + battle.p1.pokemon[i].status + "_count"];
             }
             if(battle.p1.pokemon[i].status === "par" &&
-               battle.p1.pokemon[i].baseStats.spe >= 180) {
+               battle.p1.pokemon[i].baseStoredStats.spe >= 180) {
                 ++features["p1_" + battle.p1.pokemon[i].status + "_count"];
             }
         }
         if(_.contains(STATUSES, battle.p2.pokemon[i].status)) {
             ++features["p2_" + battle.p2.pokemon[i].status + "_count"];
             if(battle.p2.pokemon[i].status === "brn" &&
-               battle.p2.pokemon[i].baseStats.atk >= 180) {
+               battle.p2.pokemon[i].baseStoredStats.atk >= 180) {
                 ++features["p2_" + battle.p2.pokemon[i].status + "_count"];
             }
             if(battle.p2.pokemon[i].status === "par" &&
-               battle.p2.pokemon[i].baseStats.spe >= 180) {
+               battle.p2.pokemon[i].baseStoredStats.spe >= 180) {
                 ++features["p2_" + battle.p2.pokemon[i].status + "_count"];
             }
 
@@ -278,12 +278,11 @@ function eval(battle) {
 
 var overallMinNode = {};
 var lastMove = '';
-var decide = module.exports.decide = function(battle, choices, useGameEndReward = true) {
+var decide = module.exports.decide = function(battle, choices, useGameEndReward = true, maxDepth = 2) {
     var startTime = new Date();
     battle.start();
 
-    var MAX_DEPTH = 1; //for now...
-    var maxNode = playerTurn(battle, MAX_DEPTH, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices, useGameEndReward);
+    var maxNode = playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices, useGameEndReward);
     if(!maxNode.action) return randombot.decide(battle, choices);
     logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);
     if(overallMinNode.action)
@@ -292,9 +291,8 @@ var decide = module.exports.decide = function(battle, choices, useGameEndReward 
     var endTime = new Date();
     logger.info("Decision took: " + (endTime - startTime) / 1000 + " seconds");
     return {
-	type: maxNode.action.type,
-	id: maxNode.action.id,
-	tree: maxNode
+        ...maxNode.action,
+	    tree: maxNode
     };
 }
 
@@ -343,7 +341,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward =
                 return -priority;
             });
             for(var i = 0; i < choices.length; i++) {
-                logger.info(choices[i].id + " with priority " + choices[i].priority);
+                logger.trace(choices[i].id + " with priority " + choices[i].priority);
             }
 	    //choices = _.sample(choices, 1); // For testing
             //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
@@ -402,7 +400,7 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 
 	// If the request is a wait request, only the player chooses an action
 	if(battle.p2.request.wait) {
-		var newbattle = clone(battle);
+        var newbattle = cloneBattle(battle);
 		newbattle.p2.decision = true;
 		newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
 		return playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
@@ -432,7 +430,7 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
         return -priority;
     });
     for(var i = 0; i < choices.length; i++) {
-        logger.info(choices[i].id + " with priority " + choices[i].priority);
+        logger.trace(choices[i].id + " with priority " + choices[i].priority);
     }
 
     // Take top 10 choices, to limit breadth of tree
@@ -440,24 +438,26 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 
 	for(var i = 0; i < choices.length; ++i) {
 		logger.trace("Cloning battle...");
-		var newbattle = clone(battle);
+		var newbattle = cloneBattle(battle);
 
 		// Register action, let battle simulate
-		if(playerAction)
+		if(playerAction) {
 			newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
-		else
+        }
+		else {   
 			newbattle.p1.decision = true;
-		    newbattle.choose('p2', BattleRoom.toChoiceString(choices[i], newbattle.p2), newbattle.rqid);
+        }
 
-                logger.info("Player action: " + BattleRoom.toChoiceString(playerAction, newbattle.p1));
-                logger.info("Opponent action: " + BattleRoom.toChoiceString(choices[i], newbattle.p2));
-                logger.info("My Resulting Health:");
+        newbattle.choose('p2', BattleRoom.toChoiceString(choices[i], newbattle.p2), newbattle.rqid);
+        logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
+                logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[i], newbattle.p2));
+                logger.trace("My Resulting Health:");
                 for(var j = 0; j < newbattle.p1.pokemon.length; j++) {
-                    logger.info(newbattle.p1.pokemon[j].id + ": " + newbattle.p1.pokemon[j].hp + "/" + newbattle.p1.pokemon[j].maxhp);
+                    logger.trace(newbattle.p1.pokemon[j].id + ": " + newbattle.p1.pokemon[j].hp + "/" + newbattle.p1.pokemon[j].maxhp);
                 }
-                logger.info("Opponent's Resulting Health:");
+                logger.trace("Opponent's Resulting Health:");
                 for(var j = 0; j < newbattle.p2.pokemon.length; j++) {
-                    logger.info(newbattle.p2.pokemon[j].id + ": " + newbattle.p2.pokemon[j].hp + "/" + newbattle.p2.pokemon[j].maxhp);
+                    logger.trace(newbattle.p2.pokemon[j].id + ": " + newbattle.p2.pokemon[j].hp + "/" + newbattle.p2.pokemon[j].maxhp);
                 }
 		var maxNode = playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
 		node.children.push(maxNode);
