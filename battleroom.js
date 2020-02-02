@@ -19,8 +19,8 @@ var logger = require('log4js').getLogger("battleroom");
 var decisionslogger = require('log4js').getLogger("decisions");
 
 //battle-engine
-var Battle = require('./battle-engine/battle');
-var BattlePokemon = require('./battle-engine/battlepokemon');
+var Battle = require('./battle-engine/battle-engine').Battle;
+var BattlePokemon = require('./battle-engine/battle-engine').BattlePokemon;
 
 var Abilities = require("./data/abilities").BattleAbilities;
 var Items = require("./data/items").BattleItems;
@@ -38,7 +38,7 @@ var BattleRoom = new JS.Class({
         this.send = sendfunc;
 
         // Construct a battle object that we will modify as our state
-        this.state = Battle.construct(id, 'base', false);
+        this.state = require('./battle-engine/battle-engine').construct('base', false, null);
         this.state.join('p1', 'botPlayer'); // We will be player 1 in our local simulation
         this.state.join('p2', 'humanPlayer');
         this.state.reportPercentages = true;
@@ -495,7 +495,7 @@ var BattleRoom = new JS.Class({
             return this.init(data);
         }
         if (data.substr(0, 9) === '|request|') {
-            return this.receiveRequest(JSON.parse(data.substr(9)));
+            return this.receiveRequest(JSON.parse(data.substr(9) || "null" ));
         }
 
         var log = data.split('\n');
