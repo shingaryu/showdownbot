@@ -215,6 +215,8 @@ var BattleRoom = new JS.Class({
         var player = tokens[2].substring(0, tokens[2].indexOf(' '));
         var pokeName = tokens[2].substring(tokens[2].indexOf(' ') + 1);
         var move = tokens[3];
+        const moveId = toId(move);
+        const dexMove = this.dexForFormat.getMove(moveId);
         var battleside = undefined;
 
         if(this.isPlayer(player)) {
@@ -230,7 +232,7 @@ var BattleRoom = new JS.Class({
         }
 
         //update last move (doesn't actually affect the bot...)
-        pokemon.lastMove = toId(move);
+        pokemon.lastMove = moveId;
 
         //if move is protect or detect, update stall counter
         if('stall' in pokemon.volatiles) {
@@ -244,25 +246,32 @@ var BattleRoom = new JS.Class({
         }
         //we are no longer newly switched (so we don't fakeout after the first turn)
         pokemon.activeTurns += 1;
-        if(!this.isPlayer(player)) { //anticipate more about the Pokemon's moves
-            if(pokemon.trueMoves.indexOf(toId(move)) < 0 && pokemon.trueMoves.length < 4) {
-                pokemon.trueMoves.push(toId(move));
-                logger.info("Determined that " + pokeName + " can use " + toId(move));
+
+        if(!this.isPlayer(player) && !dexMove.isZ && !dexMove.isMax) { //anticipate more about the Pokemon's moves
+            if(pokemon.trueMoves.indexOf(moveId) < 0 && pokemon.trueMoves.length < 4) {
+                pokemon.moveSlots.push({
+					move: dexMove.name,
+					id: dexMove.id,
+					pp: ((dexMove.noPPBoosts || dexMove.isZ) ? dexMove.pp : dexMove.pp * 8 / 5),
+					maxpp: ((dexMove.noPPBoosts || dexMove.isZ) ? dexMove.pp : dexMove.pp * 8 / 5),
+					target: dexMove.target,
+					disabled: false,
+					disabledSource: '',
+					used: true,
+                });
+                pokemon.trueMoves.push(moveId);
+                logger.info("Determined that " + pokeName + " can use " + moveId);
                 //if we have collected all of the moves, eliminate all other possibilities
                 if(pokemon.trueMoves.length >= 4) {
                     logger.info("Collected all of " + pokeName + "'s moves!");
-                    var newMoves = [];
                     var newMoveset = [];
                     for(var i = 0; i < pokemon.moveSlots.length; i++) {
                         if(pokemon.trueMoves.indexOf(pokemon.moveSlots[i].id) >= 0) {
-                            newMoves.push(pokemon.moveSlots[i].id); //store id
                             newMoveset.push(pokemon.moveSlots[i]);  //store actual moves
                         }
                     }
-                    pokemon.moves = newMoves;
                     pokemon.moveSlots = newMoveset;
                 }
-
             }
         }
 
