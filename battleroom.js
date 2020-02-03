@@ -690,142 +690,147 @@ var BattleRoom = new JS.Class({
 
     },
     recieve: function(data) {
-        if (!data) return;
+        try {
+            if (!data) return;
 
-        logger.trace("<< " + data);
-
-        if (data.substr(0, 6) === '|init|') {
-            return this.init(data);
-        }
-        if (data.substr(0, 9) === '|request|') {
-            return this.receiveRequest(JSON.parse(data.substr(9) || "null" ));
-        }
-
-        var log = data.split('\n');
-        const teamPreviewPokes = [];
-        const pokesUsedMoves = new Map();
-        for (var i = 0; i < log.length; i++) {
-            this.log += log[i] + "\n";
-
-            var tokens = log[i].split('|');
-            if (tokens.length > 1) {
-
-                if (tokens[1] === 'tier') {
-                    this.tier = tokens[2];
-                } else if (tokens[1] === 'win') {
-                    this.send("gg", this.id);
-
-                    this.winner = tokens[2];
-                    if (this.winner == global.account.username) {
-                        logger.info(this.title + ": I won this game");
-                    } else {
-                        logger.info(this.title + ": I lost this game");
-                    }
-
-                    if(program.net === "update" && this.previousState) {
-                        var playerAlive = _.any(this.state.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
-                        var opponentAlive = _.any(this.state.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
-
-                        if(!playerAlive || !opponentAlive) minimaxbot.train_net(this.previousState, null, (this.winner == global.account.username));
-                    }
-
-                    if(!program.nosave) this.saveResult();
-
-                    // Leave in two seconds
-                    var battleroom = this;
-                    setTimeout(function() {
-                        battleroom.send("/leave " + battleroom.id);
-                    }, 2000);
-
-                } else if (tokens[1] === 'poke') {
-                    // information for teampreview
-                    // store data for 'teampreview' message in following lines
-                    const poke = {
-                        side: tokens[2],
-                        details: tokens[3],
-                        hasItem: tokens.length === 5 && tokens[4] === 'item'
-                    };
-                    teamPreviewPokes.push(poke);
-                } else if (tokens[1] ==='teampreview') {
-                    const maxTeamSize = tokens[2];
-                    this.teamPreviewSelection = this.chooseTeamPokes(teamPreviewPokes, maxTeamSize);
-                } else if (tokens[1] ==='start') {
-                    this.startBattle();
-                } else if (tokens[1] === 'switch' || tokens[1] === 'drag') {
-                    this.updatePokemonOnSwitch(tokens);
-                } else if (tokens[1] === 'move') {
-                    const moveAndPoke = this.updatePokemonOnMove(tokens);
-                    pokesUsedMoves.set(moveAndPoke.move, moveAndPoke.pokemon);
-                } else if(tokens[1] === 'faint') { //we could outright remove a pokemon...
-                    //record that pokemon has fainted
-                } else if(tokens[1] === 'detailschange' || tokens[1] === 'formechange') {
-                    this.updatePokemonOnFormeChange(tokens);
-                } else if(tokens[1] === '-transform') {
-                    this.updatePokemonOnTransform(tokens);
-                } else if(tokens[1] === '-damage') { //Error: not getting to here...
-                    this.updatePokemonOnDamage(tokens);
-                } else if(tokens[1] === '-heal') {
-                    this.updatePokemonOnDamage(tokens);
-                } else if(tokens[1] === '-boost') {
-                    this.updatePokemonOnBoost(tokens, true);
-                } else if(tokens[1] === '-unboost') {
-                    this.updatePokemonOnBoost(tokens, false);
-                } else if(tokens[1] === '-setboost') {
-                    this.updatePokemonSetBoost(tokens);
-                } else if(tokens[1] === '-restoreboost') {
-                    this.updatePokemonRestoreBoost(tokens);
-                } else if(tokens[1] === '-start') {
-                    this.updatePokemonStart(tokens, true);
-                } else if(tokens[1] === '-end') {
-                    this.updatePokemonStart(tokens, false);
-                } else if(tokens[1] === '-fieldstart') {
-                    this.updateField(tokens, true, pokesUsedMoves);
-                } else if(tokens[1] === '-fieldend') {
-                    this.updateField(tokens, false, pokesUsedMoves);
-                } else if(tokens[1] === '-weather') {
-                    this.updateWeather(tokens, pokesUsedMoves);
-                } else if(tokens[1] === '-sidestart') {
-                    this.updateSideCondition(tokens, true, pokesUsedMoves);
-                } else if(tokens[1] === '-sideend') {
-                    this.updateSideCondition(tokens, false, pokesUsedMoves);
-                } else if(tokens[1] === '-status') {
-                    this.updatePokemonStatus(tokens, true);
-                } else if(tokens[1] === '-curestatus') {
-                    this.updatePokemonStatus(tokens, false);
-                } else if(tokens[1] === '-item') {
-                    this.updatePokemonOnItem(tokens, true);
-                } else if(tokens[1] === '-enditem') {
-                    this.updatePokemonOnItem(tokens, false);
-                } else if(tokens[1] === '-ability') {
-                    //relatively situational -- important for mold breaker/teravolt, etc.
-                    //needs to be recorded so that we don't accidentally lose a pokemon
-
-                    //We don't actually care about the rest of these effects, as they are merely visual
-                } else if(tokens[1] === '-supereffective') {
-
-                } else if(tokens[1] === '-crit') {
-
-                } else if(tokens[1] === '-singleturn') { //for protect. But we only care about damage...
-
-                } else if(tokens[1] === 'c') {//chat message. ignore. (or should we?)
-
-                } else if(tokens[1] === '-activate') { //protect, wonder guard, etc.
-
-                } else if(tokens[1] === '-fail') {
-
-                } else if(tokens[1] === '-immune') {
-
-                } else if(tokens[1] === 'message') {
-
-                } else if(tokens[1] === 'cant') {
-
-                } else if(tokens[1] === 'leave') {
-
-                } else if(tokens[1]) { //what if token is defined
-                    logger.info("Error: could not parse token '" + tokens[1] + "'. This needs to be implemented");
-                }
-
+            logger.trace("<< " + data);
+    
+            if (data.substr(0, 6) === '|init|') {
+                return this.init(data);
             }
+            if (data.substr(0, 9) === '|request|') {
+                return this.receiveRequest(JSON.parse(data.substr(9) || "null" ));
+            }
+    
+            var log = data.split('\n');
+            const teamPreviewPokes = [];
+            const pokesUsedMoves = new Map();
+            for (var i = 0; i < log.length; i++) {
+                this.log += log[i] + "\n";
+    
+                var tokens = log[i].split('|');
+                if (tokens.length > 1) {
+    
+                    if (tokens[1] === 'tier') {
+                        this.tier = tokens[2];
+                    } else if (tokens[1] === 'win') {
+                        this.send("gg", this.id);
+    
+                        this.winner = tokens[2];
+                        if (this.winner == global.account.username) {
+                            logger.info(this.title + ": I won this game");
+                        } else {
+                            logger.info(this.title + ": I lost this game");
+                        }
+    
+                        if(program.net === "update" && this.previousState) {
+                            var playerAlive = _.any(this.state.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
+                            var opponentAlive = _.any(this.state.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
+    
+                            if(!playerAlive || !opponentAlive) minimaxbot.train_net(this.previousState, null, (this.winner == global.account.username));
+                        }
+    
+                        if(!program.nosave) this.saveResult();
+    
+                        // Leave in two seconds
+                        var battleroom = this;
+                        setTimeout(function() {
+                            battleroom.send("/leave " + battleroom.id);
+                        }, 2000);
+    
+                    } else if (tokens[1] === 'poke') {
+                        // information for teampreview
+                        // store data for 'teampreview' message in following lines
+                        const poke = {
+                            side: tokens[2],
+                            details: tokens[3],
+                            hasItem: tokens.length === 5 && tokens[4] === 'item'
+                        };
+                        teamPreviewPokes.push(poke);
+                    } else if (tokens[1] ==='teampreview') {
+                        const maxTeamSize = tokens[2];
+                        this.teamPreviewSelection = this.chooseTeamPokes(teamPreviewPokes, maxTeamSize);
+                    } else if (tokens[1] ==='start') {
+                        this.startBattle();
+                    } else if (tokens[1] === 'switch' || tokens[1] === 'drag') {
+                        this.updatePokemonOnSwitch(tokens);
+                    } else if (tokens[1] === 'move') {
+                        const moveAndPoke = this.updatePokemonOnMove(tokens);
+                        pokesUsedMoves.set(moveAndPoke.move, moveAndPoke.pokemon);
+                    } else if(tokens[1] === 'faint') { //we could outright remove a pokemon...
+                        //record that pokemon has fainted
+                    } else if(tokens[1] === 'detailschange' || tokens[1] === 'formechange') {
+                        this.updatePokemonOnFormeChange(tokens);
+                    } else if(tokens[1] === '-transform') {
+                        this.updatePokemonOnTransform(tokens);
+                    } else if(tokens[1] === '-damage') { //Error: not getting to here...
+                        this.updatePokemonOnDamage(tokens);
+                    } else if(tokens[1] === '-heal') {
+                        this.updatePokemonOnDamage(tokens);
+                    } else if(tokens[1] === '-boost') {
+                        this.updatePokemonOnBoost(tokens, true);
+                    } else if(tokens[1] === '-unboost') {
+                        this.updatePokemonOnBoost(tokens, false);
+                    } else if(tokens[1] === '-setboost') {
+                        this.updatePokemonSetBoost(tokens);
+                    } else if(tokens[1] === '-restoreboost') {
+                        this.updatePokemonRestoreBoost(tokens);
+                    } else if(tokens[1] === '-start') {
+                        this.updatePokemonStart(tokens, true);
+                    } else if(tokens[1] === '-end') {
+                        this.updatePokemonStart(tokens, false);
+                    } else if(tokens[1] === '-fieldstart') {
+                        this.updateField(tokens, true, pokesUsedMoves);
+                    } else if(tokens[1] === '-fieldend') {
+                        this.updateField(tokens, false, pokesUsedMoves);
+                    } else if(tokens[1] === '-weather') {
+                        this.updateWeather(tokens, pokesUsedMoves);
+                    } else if(tokens[1] === '-sidestart') {
+                        this.updateSideCondition(tokens, true, pokesUsedMoves);
+                    } else if(tokens[1] === '-sideend') {
+                        this.updateSideCondition(tokens, false, pokesUsedMoves);
+                    } else if(tokens[1] === '-status') {
+                        this.updatePokemonStatus(tokens, true);
+                    } else if(tokens[1] === '-curestatus') {
+                        this.updatePokemonStatus(tokens, false);
+                    } else if(tokens[1] === '-item') {
+                        this.updatePokemonOnItem(tokens, true);
+                    } else if(tokens[1] === '-enditem') {
+                        this.updatePokemonOnItem(tokens, false);
+                    } else if(tokens[1] === '-ability') {
+                        //relatively situational -- important for mold breaker/teravolt, etc.
+                        //needs to be recorded so that we don't accidentally lose a pokemon
+    
+                        //We don't actually care about the rest of these effects, as they are merely visual
+                    } else if(tokens[1] === '-supereffective') {
+    
+                    } else if(tokens[1] === '-crit') {
+    
+                    } else if(tokens[1] === '-singleturn') { //for protect. But we only care about damage...
+    
+                    } else if(tokens[1] === 'c') {//chat message. ignore. (or should we?)
+    
+                    } else if(tokens[1] === '-activate') { //protect, wonder guard, etc.
+    
+                    } else if(tokens[1] === '-fail') {
+    
+                    } else if(tokens[1] === '-immune') {
+    
+                    } else if(tokens[1] === 'message') {
+    
+                    } else if(tokens[1] === 'cant') {
+    
+                    } else if(tokens[1] === 'leave') {
+    
+                    } else if(tokens[1]) { //what if token is defined
+                        logger.info("Error: could not parse token '" + tokens[1] + "'. This needs to be implemented");
+                    }
+                }
+            }    
+        } catch (error) {
+            logger.error(error);
+            logger.error("Something happened in BattleRoom. We will leave the game.");
+            this.send("/forfeit", this.id);
         }
     },
     saveResult: function() {
@@ -910,7 +915,7 @@ var BattleRoom = new JS.Class({
                     shiny: false
                 };
     
-                let template = this.state.dex.getTemplate(name);
+                let template = this.state.dex.getTemplate(name);               
                 Object.assign(template, templateFromSideData);
                 
                 //keep track of old pokemon
