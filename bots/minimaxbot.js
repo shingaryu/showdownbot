@@ -320,52 +320,53 @@ function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward =
 	var opponentAlive = _.any(battle.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
 	if (!playerAlive || !opponentAlive) {
         if (useGameEndReward) {
-		node.value = playerAlive ? GAME_END_REWARD : -GAME_END_REWARD;
+		    node.value = playerAlive ? GAME_END_REWARD : -GAME_END_REWARD;
         }
 		return node;
 	}
 
+    // No further search
 	if(depth == 0) {
 		node.value = eval(battle);
         node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
-	} else {
-		// If the request is a wait request, the opposing player has to take a turn, and we don't
-		if(battle.p1.request.wait) {
-			return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward);
-		}
-        var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
-        choices = arrangeP1Choices(choices, battle);
+        return node;
+    } 
+    
+    // If the request is a wait request, the opposing player has to take a turn, and we don't
+    if(battle.p1.request.wait) {
+        return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward);
+    }
 
-            for(var i = 0; i < choices.length; i++) {
-                logger.trace(choices[i].id + " with priority " + choices[i].priority);
+    var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
+    choices = arrangeP1Choices(choices, battle);
+    for(var i = 0; i < choices.length; i++) {
+        logger.trace(choices[i].id + " with priority " + choices[i].priority);
+    }
+
+    //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
+    //Essentially, the greedy algorithm
+    //Perhaps then we can increase the depth...
+    for(var i = 0; i < choices.length; ++i) {
+        if (isFoolChoice(choices[i])) {
+            continue;
+        }
+
+        // Try action
+        var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward);
+        node.children.push(minNode);
+
+        if(minNode.value != null && isFinite(minNode.value) ) {
+            if(minNode.value > node.value) {
+                node.value = minNode.value;
+                node.action = choices[i];
+                overallMinNode = minNode;
             }
-            //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
-            //Essentially, the greedy algorithm
-            //Perhaps then we can increase the depth...
+            alpha = Math.max(alpha, minNode.value);
+            if(beta <= alpha) break;
+        }
+    }
 
-	    for(var i = 0; i < choices.length; ++i) {
-            if (isFoolChoice(choices[i])) {
-                continue;
-            }
-
-		// Try action
-		var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward);
-		node.children.push(minNode);
-
-		if(minNode.value != null && isFinite(minNode.value) ) {
-                    if(minNode.value > node.value) {
-                        node.value = minNode.value;
-                        node.action = choices[i];
-                        overallMinNode = minNode;
-                    }
-                    alpha = Math.max(alpha, minNode.value);
-                    if(beta <= alpha) break;
-		}
-	    }
-
-		node.choices = choices;
-	}
-
+    node.choices = choices;
 	return node;
 }
 
@@ -393,6 +394,9 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 
 	var choices = BattleRoom.parseRequest(battle.p2.request).choices;
     choices = arrangeP2Choices(choices, battle);
+    for(var i = 0; i < choices.length; i++) {
+        logger.trace(choices[i].id + " with priority " + choices[i].priority);
+    }
 
 	// We don't have enough info to simulate the battle anymore
 	if(choices.length == 0) {
@@ -400,10 +404,6 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
         node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
 		return node;
 	}
-
-    for(var i = 0; i < choices.length; i++) {
-        logger.trace(choices[i].id + " with priority " + choices[i].priority);
-    }
 
 	for(var i = 0; i < choices.length; ++i) {
 		logger.trace("Cloning battle...");
@@ -419,15 +419,15 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 
         newbattle.choose('p2', BattleRoom.toChoiceString(choices[i], newbattle.p2), newbattle.rqid);
         logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
-                logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[i], newbattle.p2));
-                logger.trace("My Resulting Health:");
-                for(var j = 0; j < newbattle.p1.pokemon.length; j++) {
-                    logger.trace(newbattle.p1.pokemon[j].id + ": " + newbattle.p1.pokemon[j].hp + "/" + newbattle.p1.pokemon[j].maxhp);
-                }
-                logger.trace("Opponent's Resulting Health:");
-                for(var j = 0; j < newbattle.p2.pokemon.length; j++) {
-                    logger.trace(newbattle.p2.pokemon[j].id + ": " + newbattle.p2.pokemon[j].hp + "/" + newbattle.p2.pokemon[j].maxhp);
-                }
+        logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[i], newbattle.p2));
+        logger.trace("My Resulting Health:");
+        for(var j = 0; j < newbattle.p1.pokemon.length; j++) {
+            logger.trace(newbattle.p1.pokemon[j].id + ": " + newbattle.p1.pokemon[j].hp + "/" + newbattle.p1.pokemon[j].maxhp);
+        }
+        logger.trace("Opponent's Resulting Health:");
+        for(var j = 0; j < newbattle.p2.pokemon.length; j++) {
+            logger.trace(newbattle.p2.pokemon[j].id + ": " + newbattle.p2.pokemon[j].hp + "/" + newbattle.p2.pokemon[j].maxhp);
+        }
 		var maxNode = playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
 		node.children.push(maxNode);
 
