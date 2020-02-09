@@ -35,6 +35,16 @@
             ],
             "console": "integratedTerminal",
             // "autoAttachChildProcesses": true
-        }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch strength-table.js",
+            "program": "${workspaceFolder}\\strength-table.js",
+            "args": [
+                "--onlyinfo"
+            ],
+            "console": "integratedTerminal",
+        },
     ]
 }

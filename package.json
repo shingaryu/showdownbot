@@ -7,6 +7,7 @@
     "express": "^4.10.0",
     "jsclass": "4.x",
     "log4js": "1.1.1",
+    "moment": "^2.24.0",
     "nedb": "^1.8.0",
     "nunjucks": "3.x",
     "request": "2.x",
