@@ -1,4 +1,5 @@
 const clone = require('./clone');
+const PRNG = require('./showdown-sources/.sim-dist/prng').PRNG;
 
 // Some Pokemon Showdown-specific JSON parsing rules
 module.exports.safeJSON = function(data) {
@@ -186,7 +187,7 @@ module.exports.importTeam = function(text, teams) {
 	return team;
 }
 
-module.exports.cloneBattle = function(battle) {
+module.exports.cloneBattle = function(battle, copyPRNG = true) {
 	// here we exclude as many objects as we can from deep-copy
 	const excludeKeys = [
 		'dex',
@@ -207,6 +208,11 @@ module.exports.cloneBattle = function(battle) {
 	excludeKeys.forEach(key => {
 		battle[key] = newbattle[key] =  excludeValues[key];
 	})
+
+	if (!copyPRNG) {
+		newbattle.prng = new PRNG(undefined);
+		newbattle.prngSeed = newbattle.prng.startingSeed.slice();
+	}
 
 	return newbattle;
 }

@@ -278,11 +278,11 @@ function eval(battle) {
 
 var overallMinNode = {};
 var lastMove = '';
-var decide = module.exports.decide = function(battle, choices, useGameEndReward = true, maxDepth = 2) {
+var decide = module.exports.decide = function(battle, choices, useGameEndReward = true, maxDepth = 2, repetition = 1) {
     var startTime = new Date();
     battle.start();
 
-    var maxNode = playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices, useGameEndReward);
+    var maxNode = playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices, useGameEndReward, repetition);
     if(!maxNode.action) return randombot.decide(battle, choices);
     logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);
     if(overallMinNode.action)
@@ -301,7 +301,7 @@ var DISCOUNT = module.exports.DISCOUNT = 0.98;
 
 //TODO: Implement move ordering, which can be based on the original greedy algorithm
 //However, it should have slightly different priorities, such as status effects...
-function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward = true) {
+function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward = true, repetition = 1) {
 	logger.trace("Player turn at depth " + depth);
 
 	// Node in the minimax tree
@@ -334,7 +334,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward =
     
     // If the request is a wait request, the opposing player has to take a turn, and we don't
     if(battle.p1.request.wait) {
-        return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward);
+        return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward, repetition);
     }
 
     var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
@@ -352,7 +352,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward =
         }
 
         // Try action
-        var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward);
+        var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward, repetition);
         node.children.push(minNode);
 
         if(minNode.value != null && isFinite(minNode.value) ) {
@@ -370,7 +370,7 @@ function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward =
 	return node;
 }
 
-function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward = true) {
+function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward = true, repetition = 1) {
 	logger.trace("Opponent turn turn at depth " + depth);
 
 	// Node in the minimax tree
@@ -389,7 +389,7 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
         var newbattle = cloneBattle(battle);
 		newbattle.p2.decision = true;
 		newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
-		return playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
+		return playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward, repetition);
 	}
 
 	var choices = BattleRoom.parseRequest(battle.p2.request).choices;
@@ -405,47 +405,53 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 		return node;
 	}
 
-	for(var i = 0; i < choices.length; ++i) {
-		logger.trace("Cloning battle...");
-		var newbattle = cloneBattle(battle);
-
-		// Register action, let battle simulate
-		if(playerAction) {
-			newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
+    for (let i = 0; i < repetition; i++) {
+        for(let j = 0; j < choices.length; ++j) {
+            logger.trace("Cloning battle...");
+            var newbattle = cloneBattle(battle, repetition <= 1 || !playerAction);
+    
+            // Register action, let battle simulate
+            if(playerAction) {
+                newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
+            }
+            else {   
+                newbattle.p1.decision = true;
+            }
+    
+            newbattle.choose('p2', BattleRoom.toChoiceString(choices[j], newbattle.p2), newbattle.rqid);
+            logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
+            logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[j], newbattle.p2));
+            logger.trace("My Resulting Health:");
+            for(let k = 0; k < newbattle.p1.pokemon.length; k++) {
+                logger.trace(newbattle.p1.pokemon[k].id + ": " + newbattle.p1.pokemon[k].hp + "/" + newbattle.p1.pokemon[k].maxhp);
+            }
+            logger.trace("Opponent's Resulting Health:");
+            for(let k = 0; k < newbattle.p2.pokemon.length; k++) {
+                logger.trace(newbattle.p2.pokemon[k].id + ": " + newbattle.p2.pokemon[k].hp + "/" + newbattle.p2.pokemon[k].maxhp);
+            }
+            var maxNode = playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward, repetition);
+            node.children.push(maxNode);
+    
+            if(maxNode.value != null && isFinite(maxNode.value)) {
+                if(maxNode.value < node.value) {
+                    node.value = maxNode.value;
+                    node.action = choices[j];
+                }
+                beta = Math.min(beta, maxNode.value);
+                if(beta <= alpha) break;
+            }
+    
+            // Hopefully prompt garbage collection, so we don't maintain too many battle object
+            delete newbattle;
+            if(global.gc) global.gc()
         }
-		else {   
-			newbattle.p1.decision = true;
+    
+        node.choices.push(...choices);
+        // we execute the repetition when neither of players has `wait` action
+        if (!playerAction) {
+            break;
         }
-
-        newbattle.choose('p2', BattleRoom.toChoiceString(choices[i], newbattle.p2), newbattle.rqid);
-        logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
-        logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[i], newbattle.p2));
-        logger.trace("My Resulting Health:");
-        for(var j = 0; j < newbattle.p1.pokemon.length; j++) {
-            logger.trace(newbattle.p1.pokemon[j].id + ": " + newbattle.p1.pokemon[j].hp + "/" + newbattle.p1.pokemon[j].maxhp);
-        }
-        logger.trace("Opponent's Resulting Health:");
-        for(var j = 0; j < newbattle.p2.pokemon.length; j++) {
-            logger.trace(newbattle.p2.pokemon[j].id + ": " + newbattle.p2.pokemon[j].hp + "/" + newbattle.p2.pokemon[j].maxhp);
-        }
-		var maxNode = playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward);
-		node.children.push(maxNode);
-
-		if(maxNode.value != null && isFinite(maxNode.value)) {
-			if(maxNode.value < node.value) {
-				node.value = maxNode.value;
-				node.action = choices[i];
-			}
-			beta = Math.min(beta, maxNode.value);
-			if(beta <= alpha) break;
-		}
-
-		// Hopefully prompt garbage collection, so we don't maintain too many battle object
-		delete newbattle;
-		if(global.gc) global.gc()
-	}
-
-	node.choices = choices;
+    }
 	return node;
 }
 
