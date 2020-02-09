@@ -333,35 +333,20 @@ function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward =
 		if(battle.p1.request.wait) {
 			return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward);
 		}
-		var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
-            //sort choices
-            choices = _.sortBy(choices, function(choice) {
-                var priority = greedybot.getPriority(battle, choice, battle.p1, battle.p2);
-                choice.priority = priority;
-                return -priority;
-            });
+        var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
+        choices = arrangeP1Choices(choices, battle);
+
             for(var i = 0; i < choices.length; i++) {
                 logger.trace(choices[i].id + " with priority " + choices[i].priority);
             }
-	    //choices = _.sample(choices, 1); // For testing
             //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
             //Essentially, the greedy algorithm
             //Perhaps then we can increase the depth...
 
 	    for(var i = 0; i < choices.length; ++i) {
-                if(choices[i].id === 'wish' && lastMove === 'wish') //don't wish twice in a row
-                    continue;
-                if(choices[i].id === 'protect' && lastMove === 'protect') //don't protect twice in a row. Not completely accurate...
-                    continue;
-                if(choices[i].id === 'spikysheild' && lastMove === 'spikyshield') //don't protect twice in a row. Not completely accurate...
-                    continue;
-                if(choices[i].id === 'kingsshield' && lastMove === 'kingssheild') //don't protect twice in a row. Not completely accurate...
-                    continue;
-                if(choices[i].id === 'detect' && lastMove === 'detect') //don't protect twice in a row. Not completely accurate...
-                    continue;
-
-                if(choices[i].id === 'fakeout' && lastMove === 'fakeout') //don't fakeout twice in a row. Not completely accurate...
-                    continue;
+            if (isFoolChoice(choices[i])) {
+                continue;
+            }
 
 		// Try action
 		var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward);
@@ -407,14 +392,7 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 	}
 
 	var choices = BattleRoom.parseRequest(battle.p2.request).choices;
-
-	// Make sure we can't switch to a Bulbasaur or to a fainted pokemon
-	choices = _.reject(choices, function(choice) {
-		if(choice.type == "switch" &&
-                   (battle.p2.pokemon[choice.id].name == "Bulbasaur" ||
-                    !battle.p2.pokemon[choice.id].hp)) return true;
-		return false;
-	});
+    choices = arrangeP2Choices(choices, battle);
 
 	// We don't have enough info to simulate the battle anymore
 	if(choices.length == 0) {
@@ -423,18 +401,9 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 		return node;
 	}
 
-    //sort choices
-    choices = _.sortBy(choices, function(choice) {
-        var priority = greedybot.getPriority(battle, choice, battle.p2, battle.p1);
-        choice.priority = priority;
-        return -priority;
-    });
     for(var i = 0; i < choices.length; i++) {
         logger.trace(choices[i].id + " with priority " + choices[i].priority);
     }
-
-    // Take top 10 choices, to limit breadth of tree
-    choices = _.take(choices, 10);
 
 	for(var i = 0; i < choices.length; ++i) {
 		logger.trace("Cloning battle...");
@@ -478,4 +447,52 @@ function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward
 
 	node.choices = choices;
 	return node;
+}
+
+function arrangeP1Choices(choices, battle) {
+    //sort choices
+    choices = _.sortBy(choices, function(choice) {
+        var priority = greedybot.getPriority(battle, choice, battle.p1, battle.p2);
+        choice.priority = priority;
+        return -priority;
+    });
+
+    return choices;
+}
+
+function arrangeP2Choices(choices, battle) {
+	// Make sure we can't switch to a Bulbasaur or to a fainted pokemon
+	choices = _.reject(choices, function(choice) {
+		if(choice.type == "switch" &&
+                   (battle.p2.pokemon[choice.id].name == "Bulbasaur" ||
+                    !battle.p2.pokemon[choice.id].hp)) return true;
+		return false;
+	});
+
+    //sort choices
+    choices = _.sortBy(choices, function(choice) {
+        var priority = greedybot.getPriority(battle, choice, battle.p2, battle.p1);
+        choice.priority = priority;
+        return -priority;
+    });
+
+    // Take top 10 choices, to limit breadth of tree
+    choices = _.take(choices, 10);
+
+    return choices;
+}
+
+function isFoolChoice(p1Choice) {
+    if(p1Choice.id === 'wish' && lastMove === 'wish') //don't wish twice in a row
+        return true;
+    if(p1Choice.id === 'protect' && lastMove === 'protect') //don't protect twice in a row. Not completely accurate...
+        return true;
+    if(p1Choice.id === 'spikysheild' && lastMove === 'spikyshield') //don't protect twice in a row. Not completely accurate...
+        return true;
+    if(p1Choice.id === 'kingsshield' && lastMove === 'kingssheild') //don't protect twice in a row. Not completely accurate...
+        return true;
+    if(p1Choice.id === 'detect' && lastMove === 'detect') //don't protect twice in a row. Not completely accurate...
+        return true;
+    if(p1Choice.id === 'fakeout' && lastMove === 'fakeout') //don't fakeout twice in a row. Not completely accurate...
+        return true;
 }
