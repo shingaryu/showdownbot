@@ -276,229 +276,237 @@ function eval(battle) {
     return value;
 }
 
-var overallMinNode = {};
-var lastMove = '';
-var decide = module.exports.decide = function(battle, choices, useGameEndReward = true, maxDepth = 2, repetition = 1) {
-    var startTime = new Date();
-    battle.start();
-
-    var maxNode = playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices, useGameEndReward, repetition);
-    if(!maxNode.action) return randombot.decide(battle, choices);
-    logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);
-    if(overallMinNode.action)
-        logger.info("Predicted opponent action: " + overallMinNode.action.type + " " + overallMinNode.action.id);
-    lastMove = maxNode.action.id;
-    var endTime = new Date();
-    logger.info("Decision took: " + (endTime - startTime) / 1000 + " seconds");
-    return {
-        ...maxNode.action,
-	    tree: maxNode
-    };
-}
-
 var GAME_END_REWARD = module.exports.GAME_END_REWARD = 1000000;
 var DISCOUNT = module.exports.DISCOUNT = 0.98;
 
-//TODO: Implement move ordering, which can be based on the original greedy algorithm
-//However, it should have slightly different priorities, such as status effects...
-function playerTurn(battle, depth, alpha, beta, givenchoices, useGameEndReward = true, repetition = 1) {
-	logger.trace("Player turn at depth " + depth);
+class Minimax {
+    constructor(useGameEndReward = true, repetition = 1) {
+        this.overallMinNode = {};
+        this.lastMove = '';
+        this.useGameEndReward = useGameEndReward;
+        this.repetition = repetition;
+    };
 
-	// Node in the minimax tree
-	var node = {
-		type : "max",
-		value : Number.NEGATIVE_INFINITY,
-		depth : depth,
-		choices : [],
-		children : [],
-		action : null,
-		state : battle.toString()
-	};
-
-	// Look for win / loss
-	var playerAlive = _.any(battle.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
-	var opponentAlive = _.any(battle.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
-	if (!playerAlive || !opponentAlive) {
-        if (useGameEndReward) {
-		    node.value = playerAlive ? GAME_END_REWARD : -GAME_END_REWARD;
+    decide(battle, choices, maxDepth = 2) {
+        var startTime = new Date();
+        battle.start();
+    
+        var maxNode = this.playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices);
+        if(!maxNode.action) return randombot.decide(battle, choices);
+        logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);
+        if(this.overallMinNode.action)
+            logger.info("Predicted opponent action: " + this.overallMinNode.action.type + " " + this.overallMinNode.action.id);
+        this.lastMove = maxNode.action.id;
+        var endTime = new Date();
+        logger.info("Decision took: " + (endTime - startTime) / 1000 + " seconds");
+        return {
+            ...maxNode.action,
+            tree: maxNode
+        };
+    }
+    
+    //TODO: Implement move ordering, which can be based on the original greedy algorithm
+    //However, it should have slightly different priorities, such as status effects...
+    playerTurn(battle, depth, alpha, beta, givenchoices) {
+        logger.trace("Player turn at depth " + depth);
+    
+        // Node in the minimax tree
+        var node = {
+            type : "max",
+            value : Number.NEGATIVE_INFINITY,
+            depth : depth,
+            choices : [],
+            children : [],
+            action : null,
+            state : battle.toString()
+        };
+    
+        // Look for win / loss
+        var playerAlive = _.any(battle.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
+        var opponentAlive = _.any(battle.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
+        if (!playerAlive || !opponentAlive) {
+            if (this.useGameEndReward) {
+                node.value = playerAlive ? GAME_END_REWARD : -GAME_END_REWARD;
+            }
+            return node;
         }
-		return node;
-	}
-
-    // No further search
-	if(depth == 0) {
-		node.value = eval(battle);
-        node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
-        return node;
-    } 
     
-    // If the request is a wait request, the opposing player has to take a turn, and we don't
-    if(battle.p1.request.wait) {
-        return opponentTurn(battle, depth, alpha, beta, null, useGameEndReward, repetition);
-    }
-
-    var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
-    choices = arrangeP1Choices(choices, battle);
-    for(var i = 0; i < choices.length; i++) {
-        logger.trace(choices[i].id + " with priority " + choices[i].priority);
-    }
-
-    //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
-    //Essentially, the greedy algorithm
-    //Perhaps then we can increase the depth...
-    for(var i = 0; i < choices.length; ++i) {
-        if (isFoolChoice(choices[i])) {
-            continue;
+        // No further search
+        if(depth == 0) {
+            node.value = eval(battle);
+            node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
+            return node;
+        } 
+        
+        // If the request is a wait request, the opposing player has to take a turn, and we don't
+        if(battle.p1.request.wait) {
+            return this.opponentTurn(battle, depth, alpha, beta, null);
         }
-
-        // Try action
-        var minNode = opponentTurn(battle, depth, alpha, beta, choices[i], useGameEndReward, repetition);
-        node.children.push(minNode);
-
-        if(minNode.value != null && isFinite(minNode.value) ) {
-            if(minNode.value > node.value) {
-                node.value = minNode.value;
-                node.action = choices[i];
-                overallMinNode = minNode;
-            }
-            alpha = Math.max(alpha, minNode.value);
-            if(beta <= alpha) break;
+    
+        var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
+        choices = this.arrangeP1Choices(choices, battle);
+        for(var i = 0; i < choices.length; i++) {
+            logger.trace(choices[i].id + " with priority " + choices[i].priority);
         }
-    }
-
-    node.choices = choices;
-	return node;
-}
-
-function opponentTurn(battle, depth, alpha, beta, playerAction, useGameEndReward = true, repetition = 1) {
-	logger.trace("Opponent turn turn at depth " + depth);
-
-	// Node in the minimax tree
-	var node = {
-		type : "min",
-		value : Number.POSITIVE_INFINITY,
-		depth : depth,
-		choices : [],
-		children : [],
-		action : null,
-		state: battle.toString()
-	}
-
-	// If the request is a wait request, only the player chooses an action
-	if(battle.p2.request.wait) {
-        var newbattle = cloneBattle(battle);
-		newbattle.p2.decision = true;
-		newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
-		return playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward, repetition);
-	}
-
-	var choices = BattleRoom.parseRequest(battle.p2.request).choices;
-    choices = arrangeP2Choices(choices, battle);
-    for(var i = 0; i < choices.length; i++) {
-        logger.trace(choices[i].id + " with priority " + choices[i].priority);
-    }
-
-	// We don't have enough info to simulate the battle anymore
-	if(choices.length == 0) {
-		node.value = eval(battle);
-        node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
-		return node;
-	}
-
-    for (let i = 0; i < repetition; i++) {
-        for(let j = 0; j < choices.length; ++j) {
-            logger.trace("Cloning battle...");
-            var newbattle = cloneBattle(battle, repetition <= 1 || !playerAction);
     
-            // Register action, let battle simulate
-            if(playerAction) {
-                newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
-            }
-            else {   
-                newbattle.p1.decision = true;
+        //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
+        //Essentially, the greedy algorithm
+        //Perhaps then we can increase the depth...
+        for(var i = 0; i < choices.length; ++i) {
+            if (this.isFoolChoice(choices[i])) {
+                continue;
             }
     
-            newbattle.choose('p2', BattleRoom.toChoiceString(choices[j], newbattle.p2), newbattle.rqid);
-            logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
-            logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[j], newbattle.p2));
-            logger.trace("My Resulting Health:");
-            for(let k = 0; k < newbattle.p1.pokemon.length; k++) {
-                logger.trace(newbattle.p1.pokemon[k].id + ": " + newbattle.p1.pokemon[k].hp + "/" + newbattle.p1.pokemon[k].maxhp);
-            }
-            logger.trace("Opponent's Resulting Health:");
-            for(let k = 0; k < newbattle.p2.pokemon.length; k++) {
-                logger.trace(newbattle.p2.pokemon[k].id + ": " + newbattle.p2.pokemon[k].hp + "/" + newbattle.p2.pokemon[k].maxhp);
-            }
-            var maxNode = playerTurn(newbattle, depth - 1, alpha, beta, null, useGameEndReward, repetition);
-            node.children.push(maxNode);
+            // Try action
+            var minNode = this.opponentTurn(battle, depth, alpha, beta, choices[i]);
+            node.children.push(minNode);
     
-            if(maxNode.value != null && isFinite(maxNode.value)) {
-                if(maxNode.value < node.value) {
-                    node.value = maxNode.value;
-                    node.action = choices[j];
+            if(minNode.value != null && isFinite(minNode.value) ) {
+                if(minNode.value > node.value) {
+                    node.value = minNode.value;
+                    node.action = choices[i];
+                    this.overallMinNode = minNode;
                 }
-                beta = Math.min(beta, maxNode.value);
+                alpha = Math.max(alpha, minNode.value);
                 if(beta <= alpha) break;
             }
-    
-            // Hopefully prompt garbage collection, so we don't maintain too many battle object
-            delete newbattle;
-            if(global.gc) global.gc()
         }
     
-        node.choices.push(...choices);
-        // we execute the repetition when neither of players has `wait` action
-        if (!playerAction) {
-            break;
-        }
+        node.choices = choices;
+        return node;
     }
-	return node;
+    
+    opponentTurn(battle, depth, alpha, beta, playerAction) {
+        logger.trace("Opponent turn turn at depth " + depth);
+    
+        // Node in the minimax tree
+        var node = {
+            type : "min",
+            value : Number.POSITIVE_INFINITY,
+            depth : depth,
+            choices : [],
+            children : [],
+            action : null,
+            state: battle.toString()
+        }
+    
+        // If the request is a wait request, only the player chooses an action
+        if(battle.p2.request.wait) {
+            var newbattle = cloneBattle(battle);
+            newbattle.p2.decision = true;
+            newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
+            return this.playerTurn(newbattle, depth - 1, alpha, beta, null);
+        }
+    
+        var choices = BattleRoom.parseRequest(battle.p2.request).choices;
+        choices = this.arrangeP2Choices(choices, battle);
+        for(var i = 0; i < choices.length; i++) {
+            logger.trace(choices[i].id + " with priority " + choices[i].priority);
+        }
+    
+        // We don't have enough info to simulate the battle anymore
+        if(choices.length == 0) {
+            node.value = eval(battle);
+            node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
+            return node;
+        }
+    
+        for (let i = 0; i < this.repetition; i++) {
+            for(let j = 0; j < choices.length; ++j) {
+                logger.trace("Cloning battle...");
+                var newbattle = cloneBattle(battle, this.repetition <= 1 || !playerAction);
+        
+                // Register action, let battle simulate
+                if(playerAction) {
+                    newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
+                }
+                else {   
+                    newbattle.p1.decision = true;
+                }
+        
+                newbattle.choose('p2', BattleRoom.toChoiceString(choices[j], newbattle.p2), newbattle.rqid);
+                logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
+                logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[j], newbattle.p2));
+                logger.trace("My Resulting Health:");
+                for(let k = 0; k < newbattle.p1.pokemon.length; k++) {
+                    logger.trace(newbattle.p1.pokemon[k].id + ": " + newbattle.p1.pokemon[k].hp + "/" + newbattle.p1.pokemon[k].maxhp);
+                }
+                logger.trace("Opponent's Resulting Health:");
+                for(let k = 0; k < newbattle.p2.pokemon.length; k++) {
+                    logger.trace(newbattle.p2.pokemon[k].id + ": " + newbattle.p2.pokemon[k].hp + "/" + newbattle.p2.pokemon[k].maxhp);
+                }
+                var maxNode = this.playerTurn(newbattle, depth - 1, alpha, beta, null);
+                node.children.push(maxNode);
+        
+                if(maxNode.value != null && isFinite(maxNode.value)) {
+                    if(maxNode.value < node.value) {
+                        node.value = maxNode.value;
+                        node.action = choices[j];
+                    }
+                    beta = Math.min(beta, maxNode.value);
+                    if(beta <= alpha) break;
+                }
+        
+                // Hopefully prompt garbage collection, so we don't maintain too many battle object
+                newbattle = null;
+                if(global.gc) global.gc()
+            }
+        
+            node.choices.push(...choices);
+            // we execute the repetition when neither of players has `wait` action
+            if (!playerAction) {
+                break;
+            }
+        }
+        return node;
+    }
+    
+    arrangeP1Choices(choices, battle) {
+        //sort choices
+        choices = _.sortBy(choices, function(choice) {
+            var priority = greedybot.getPriority(battle, choice, battle.p1, battle.p2);
+            choice.priority = priority;
+            return -priority;
+        });
+    
+        return choices;
+    }
+    
+    arrangeP2Choices(choices, battle) {
+        // Make sure we can't switch to a Bulbasaur or to a fainted pokemon
+        choices = _.reject(choices, function(choice) {
+            if(choice.type == "switch" &&
+                       (battle.p2.pokemon[choice.id].name == "Bulbasaur" ||
+                        !battle.p2.pokemon[choice.id].hp)) return true;
+            return false;
+        });
+    
+        //sort choices
+        choices = _.sortBy(choices, function(choice) {
+            var priority = greedybot.getPriority(battle, choice, battle.p2, battle.p1);
+            choice.priority = priority;
+            return -priority;
+        });
+    
+        // Take top 10 choices, to limit breadth of tree
+        choices = _.take(choices, 10);
+    
+        return choices;
+    }
+    
+    isFoolChoice(p1Choice) {
+        if(p1Choice.id === 'wish' && this.lastMove === 'wish') //don't wish twice in a row
+            return true;
+        if(p1Choice.id === 'protect' && this.lastMove === 'protect') //don't protect twice in a row. Not completely accurate...
+            return true;
+        if(p1Choice.id === 'spikysheild' && this.lastMove === 'spikyshield') //don't protect twice in a row. Not completely accurate...
+            return true;
+        if(p1Choice.id === 'kingsshield' && this.lastMove === 'kingssheild') //don't protect twice in a row. Not completely accurate...
+            return true;
+        if(p1Choice.id === 'detect' && this.lastMove === 'detect') //don't protect twice in a row. Not completely accurate...
+            return true;
+        if(p1Choice.id === 'fakeout' && this.lastMove === 'fakeout') //don't fakeout twice in a row. Not completely accurate...
+            return true;
+    }
 }
-
-function arrangeP1Choices(choices, battle) {
-    //sort choices
-    choices = _.sortBy(choices, function(choice) {
-        var priority = greedybot.getPriority(battle, choice, battle.p1, battle.p2);
-        choice.priority = priority;
-        return -priority;
-    });
-
-    return choices;
-}
-
-function arrangeP2Choices(choices, battle) {
-	// Make sure we can't switch to a Bulbasaur or to a fainted pokemon
-	choices = _.reject(choices, function(choice) {
-		if(choice.type == "switch" &&
-                   (battle.p2.pokemon[choice.id].name == "Bulbasaur" ||
-                    !battle.p2.pokemon[choice.id].hp)) return true;
-		return false;
-	});
-
-    //sort choices
-    choices = _.sortBy(choices, function(choice) {
-        var priority = greedybot.getPriority(battle, choice, battle.p2, battle.p1);
-        choice.priority = priority;
-        return -priority;
-    });
-
-    // Take top 10 choices, to limit breadth of tree
-    choices = _.take(choices, 10);
-
-    return choices;
-}
-
-function isFoolChoice(p1Choice) {
-    if(p1Choice.id === 'wish' && lastMove === 'wish') //don't wish twice in a row
-        return true;
-    if(p1Choice.id === 'protect' && lastMove === 'protect') //don't protect twice in a row. Not completely accurate...
-        return true;
-    if(p1Choice.id === 'spikysheild' && lastMove === 'spikyshield') //don't protect twice in a row. Not completely accurate...
-        return true;
-    if(p1Choice.id === 'kingsshield' && lastMove === 'kingssheild') //don't protect twice in a row. Not completely accurate...
-        return true;
-    if(p1Choice.id === 'detect' && lastMove === 'detect') //don't protect twice in a row. Not completely accurate...
-        return true;
-    if(p1Choice.id === 'fakeout' && lastMove === 'fakeout') //don't fakeout twice in a row. Not completely accurate...
-        return true;
-}
+module.exports.Minimax = Minimax;

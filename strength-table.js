@@ -13,7 +13,7 @@ const fs = require('fs');
 const Dex = require('./showdown-sources/.sim-dist/dex').Dex;
 const PcmBattle = require('./percymon-battle-engine').PcmBattle;
 const BattleRoom = require("./battleroom");
-const minimaxbot = require("./bots/minimaxbot");
+const Minimax = require("./bots/minimaxbot").Minimax;
 const cloneBattle = require('./util').cloneBattle;
 const importTeam = require('./util').importTeam;
 const initLog4js = require('./initLog4js');
@@ -23,9 +23,9 @@ const moment = require('moment');
 initLog4js(global.program.nolog, global.program.onlyinfo);
 const logger = require('log4js').getLogger("bot");
 
-makeStrengthTable();
+makeStrengthTable(10, 1, 1);
 
-function makeStrengthTable() {
+function makeStrengthTable(oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 1) {
   const dirName = 'strength-table';
   const filenames = fs.readdirSync('./' + dirName);
 
@@ -53,8 +53,8 @@ function makeStrengthTable() {
 	const customGameFormat = Dex.getFormat(`gen8customgame`, true);
 	customGameFormat.ruleset = customGameFormat.ruleset.filter(rule => rule !== 'Team Preview');
 
-	const oneOnOneRepetition = 1;
-	logger.info("start evaluating One-On-One strength...")
+  logger.info("start evaluating One-On-One strength...")
+  const minimax = new Minimax(false, minimaxRepetiton);
   const evalValueTable = [];
   for (let i = 0; i < targetsVertical.length; i++) {
     const myPoke = targetsVertical[i];  
@@ -71,7 +71,7 @@ function makeStrengthTable() {
         battle.start();              
         battle.makeRequest();                   
         const decision = BattleRoom.parseRequest(battle.p1.request);
-        const evalValue = minimaxbot.decide(cloneBattle(battle), decision.choices, false, 1, 1).tree.value;
+        const evalValue = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth).tree.value;
         repeatedOneOnOneValues.push(evalValue);
       }
 
@@ -104,7 +104,7 @@ function makeStrengthTable() {
   }
   
   writeEvalTable(evalValueTable, targetsVertical.map(x => x.name), targetsHorizontal.map(x => x.name),
-    `str_table_${moment().format('YYYYMMDDHHmmss')}.csv`);
+    `str_table_${oneOnOneRepetition}_${minimaxDepth}_${minimaxRepetiton}_${moment().format('YYYYMMDDHHmmss')}.csv`);
 }
 
 function stdDev(values) {

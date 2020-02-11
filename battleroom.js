@@ -1008,7 +1008,10 @@ var BattleRoom = new JS.Class({
             // Use specified algorithm to determine resulting choice
             var result = undefined;
             if(decision.choices.length == 1) result = decision.choices[0];
-            else if(program.algorithm === "minimax") result = minimaxbot.decide(cloneBattle(room.state), decision.choices, true, program.depth);
+            else if(program.algorithm === "minimax") {
+                const minimax = new Minimax(true, 1); 
+                result = minimax.decide(cloneBattle(room.state), decision.choices, program.depth);
+            } 
             else if(program.algorithm === "greedy") result = greedybot.decide(cloneBattle(room.state), decision.choices);
             else if(program.algorithm === "random") result = randombot.decide(cloneBattle(room.state), decision.choices);
 
@@ -1085,5 +1088,6 @@ var BattleRoom = new JS.Class({
 module.exports = BattleRoom;
 
 var minimaxbot = require("./bots/minimaxbot");
+const Minimax = minimaxbot.Minimax;
 var greedybot = require("./bots/greedybot");
 var randombot = require("./bots/randombot");
