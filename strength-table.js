@@ -23,9 +23,14 @@ const moment = require('moment');
 initLog4js(global.program.nolog, global.program.onlyinfo);
 const logger = require('log4js').getLogger("bot");
 
-makeStrengthTable(10, 1, 1);
+const weights = {
+  "p1_hp": 1024,
+  "p2_hp": -1024,
+}
 
-function makeStrengthTable(oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 1) {
+makeStrengthTable(weights, 10, 1, 1);
+
+function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 1) {
   const dirName = 'strength-table';
   const filenames = fs.readdirSync('./' + dirName);
 
@@ -54,7 +59,7 @@ function makeStrengthTable(oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 
 	customGameFormat.ruleset = customGameFormat.ruleset.filter(rule => rule !== 'Team Preview');
 
   logger.info("start evaluating One-On-One strength...")
-  const minimax = new Minimax(false, minimaxRepetiton);
+  const minimax = new Minimax(false, minimaxRepetiton, false, weights);
   const evalValueTable = [];
   for (let i = 0; i < targetsVertical.length; i++) {
     const myPoke = targetsVertical[i];  
@@ -71,7 +76,15 @@ function makeStrengthTable(oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 
         battle.start();              
         battle.makeRequest();                   
         const decision = BattleRoom.parseRequest(battle.p1.request);
-        const evalValue = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth).tree.value;
+        const minimaxDecision = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth);
+        try {
+          fs.writeFileSync(`./${dirName}/Decision Logs/(${i})${myPoke.name}-(${j})${oppPoke.name}_${k}.json`, JSON.stringify(minimaxDecision));
+        } catch (e) {
+          logger.warn('failed to save decision data!');
+          logger.warn(e);
+        }
+
+        const evalValue = minimaxDecision.tree.value;
         repeatedOneOnOneValues.push(evalValue);
       }
 
@@ -104,7 +117,7 @@ function makeStrengthTable(oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 
   }
   
   writeEvalTable(evalValueTable, targetsVertical.map(x => x.name), targetsHorizontal.map(x => x.name),
-    `str_table_${oneOnOneRepetition}_${minimaxDepth}_${minimaxRepetiton}_${moment().format('YYYYMMDDHHmmss')}.csv`);
+    `./${dirName}/Outputs/str_table_${oneOnOneRepetition}_${minimaxDepth}_${minimaxRepetiton}_${moment().format('YYYYMMDDHHmmss')}.csv`);
 }
 
 function stdDev(values) {

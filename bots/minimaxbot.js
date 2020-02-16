@@ -47,8 +47,8 @@ BATTLE_FEATURES.push("p2_hp");
 
 module.exports.BATTLE_FEATURES = BATTLE_FEATURES;
 
-function featureVector(battle) {
-    var features = getFeatures(battle);
+function featureVector(battle, p1Choices) {
+    var features = getFeatures(battle, p1Choices);
     var vec = _.map(BATTLE_FEATURES, function(feature) {
        return features[feature];
     });
@@ -114,7 +114,8 @@ var train_net = module.exports.train_net = function(battle, newbattle, win) {
         value *= DISCOUNT;
     }
     else {
-        value = DISCOUNT * eval(newbattle);
+        const p1Choices = BattleRoom.parseRequest(battle.p1.request).choices;
+        value = DISCOUNT * eval(newbattle, p1Choices, defaultWeights);
 
         var isAlive = function(pokemon) { return pokemon.hp > 0; };
         var opponentDied = _.filter(battle.p2.pokemon, isAlive).length - _.filter(newbattle.p2.pokemon, isAlive).length;
@@ -135,7 +136,7 @@ var train_net = module.exports.train_net = function(battle, newbattle, win) {
 }
 
 //TODO: Features should not take into account Bulbasaur pokemon. (Doesn't really matter now, but it will...)
-function getFeatures(battle) {
+function getFeatures(battle, p1Choices) {
     var features = {};
 
     // Side conditions
@@ -238,8 +239,7 @@ function getFeatures(battle) {
     features.faster = (battle.p1.active[0].speed > battle.p2.active[0].speed) ? 1 : 0;
 
     //-damage potential. Use greedybot to determine if there are good moves that we have in this state
-    var choices = BattleRoom.parseRequest(battle.p1.request).choices;
-    var priorities = _.map(choices, function(choice) {
+    var priorities = _.map(p1Choices, function(choice) {
         return greedybot.getPriority(battle, choice, battle.p1, battle.p2);
     });
 
@@ -256,19 +256,19 @@ function getFeatures(battle) {
     return features;
 }
 
-var weights = require("./../weights.js");
+var defaultWeights = require("./../weights.js");
 
 //TODO: Eval function needs to be made 1000x better
-function eval(battle) {
+function eval(battle, p1Choices, weights) {
     var value = 0;
-    var features = getFeatures(battle);
+    var features = getFeatures(battle, p1Choices);
 
     if(global.program.net === "none") {
         for (var key in weights) {
             if(key in features) value += weights[key] * features[key];
         }
     } else if (global.program.net === "update" || global.program.net === "use") {
-        var vec = featureVector(battle);
+        var vec = featureVector(battle, p1Choices);
         value = net.forward(vec).w[0];
     }
 
@@ -280,11 +280,13 @@ var GAME_END_REWARD = module.exports.GAME_END_REWARD = 1000000;
 var DISCOUNT = module.exports.DISCOUNT = 0.98;
 
 class Minimax {
-    constructor(useGameEndReward = true, repetition = 1) {
+    constructor(useGameEndReward = true, repetition = 1, useDynamax = true, weights = null) {
         this.overallMinNode = {};
         this.lastMove = '';
         this.useGameEndReward = useGameEndReward;
         this.repetition = repetition;
+        this.useDynamax = useDynamax;
+        this.weights = weights || defaultWeights;
     };
 
     decide(battle, choices, maxDepth = 2) {
@@ -321,32 +323,36 @@ class Minimax {
             state : battle.toString()
         };
     
+        var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
+        choices = this.arrangeP1Choices(choices, battle);
+        for(var i = 0; i < choices.length; i++) {
+            logger.trace(choices[i].id + " with priority " + choices[i].priority);
+        }
+
         // Look for win / loss
         var playerAlive = _.any(battle.p1.pokemon, function(pokemon) { return pokemon.hp > 0; });
         var opponentAlive = _.any(battle.p2.pokemon, function(pokemon) { return pokemon.hp > 0; });
         if (!playerAlive || !opponentAlive) {
             if (this.useGameEndReward) {
                 node.value = playerAlive ? GAME_END_REWARD : -GAME_END_REWARD;
+            } else {
+                node.value = eval(battle, choices, this.weights);
+                node.state += "\n" + JSON.stringify(getFeatures(battle, choices), undefined, 2);
             }
+
             return node;
         }
     
         // No further search
         if(depth == 0) {
-            node.value = eval(battle);
-            node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
+            node.value = eval(battle, choices, this.weights);
+            node.state += "\n" + JSON.stringify(getFeatures(battle, choices), undefined, 2);
             return node;
         } 
         
         // If the request is a wait request, the opposing player has to take a turn, and we don't
         if(battle.p1.request.wait) {
             return this.opponentTurn(battle, depth, alpha, beta, null);
-        }
-    
-        var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
-        choices = this.arrangeP1Choices(choices, battle);
-        for(var i = 0; i < choices.length; i++) {
-            logger.trace(choices[i].id + " with priority " + choices[i].priority);
         }
     
         //TODO: before looping through moves, move choices from array to priority queue to give certain moves higher priority than others
@@ -406,8 +412,8 @@ class Minimax {
     
         // We don't have enough info to simulate the battle anymore
         if(choices.length == 0) {
-            node.value = eval(battle);
-            node.state += "\n" + JSON.stringify(getFeatures(battle), undefined, 2);
+            node.value = eval(battle, [], this.weights);
+            node.state += "\n" + JSON.stringify(getFeatures(battle, []), undefined, 2);
             return node;
         }
     
@@ -469,6 +475,12 @@ class Minimax {
             return -priority;
         });
     
+        if (!this.useDynamax) {
+            choices = _.reject(choices, (choice) => 
+                (choice.type == "move" && choice.runDynamax) 
+            );
+        }
+
         return choices;
     }
     
@@ -491,6 +503,12 @@ class Minimax {
         // Take top 10 choices, to limit breadth of tree
         choices = _.take(choices, 10);
     
+        if (!this.useDynamax) {
+            choices = _.reject(choices, (choice) => 
+                (choice.type == "move" && choice.runDynamax) 
+            );
+        }
+
         return choices;
     }
     
