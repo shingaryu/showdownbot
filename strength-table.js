@@ -63,7 +63,7 @@ function makeStrengthTable(oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 
       const oppPoke = targetsHorizontal[j];
       logger.info(`evaluate about ${myPoke.name} vs ${oppPoke.name}`);
       const repeatedOneOnOneValues = []; 
-      for (let i = 0; i < oneOnOneRepetition; i++) {
+      for (let k = 0; k < oneOnOneRepetition; k++) {
         const p1 = { name: 'botPlayer', avatar: 1, team: [myPoke] };
         const p2 = { name: 'humanPlayer', avatar: 1, team: [oppPoke] };								
         const battleOptions = { format: customGameFormat, rated: false, send: null, p1, p2 };
