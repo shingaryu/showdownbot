@@ -46,5 +46,12 @@
             ],
             "console": "integratedTerminal",
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch combination calc",
+            "program": "${workspaceFolder}\\combination-calculator.js",
+            "console": "integratedTerminal",
+        },
     ]
 }
