@@ -8,7 +8,7 @@ src.on('data', row => {
 })
 src.on('end', () => {
   let numberOfValues = -1;
-  let strengthVectors = []; 
+  let strengthRows = []; 
   let index = 0;
 
   console.log(`${tableRows.length} rows are loaded`);
@@ -18,9 +18,9 @@ src.on('end', () => {
       return;
     }
     const records = row.split(',');
-    const strengthVector = {};
-    strengthVector['index'] = index++;
-    strengthVector['name'] = records[0];
+    const strengthRow = {};
+    strengthRow['index'] = index++;
+    strengthRow['name'] = records[0];
     const values = records.slice(1);
     if (numberOfValues === -1) {
       numberOfValues = values.length;
@@ -29,36 +29,25 @@ src.on('end', () => {
         throw new Error('error: the number of column is not same among different rows');
       }
     }
-    strengthVector['vector'] = values.map(v => parseFloat(v));
+    strengthRow['vector'] = values.map(v => parseFloat(v));
   
-    strengthVectors.push(strengthVector);
+    strengthRows.push(strengthRow);
 
   }) 
-  constructTeamByIngenMethod(strengthVectors, 17);
+  constructTeamByIngenMethod(strengthRows, 17);
 })
 
-function constructTeamByIngenMethod(strengthVectors, firstPokemonIndex) {
+function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   // (1) select the first pokemon
-  const firstPoke = strengthVectors[firstPokemonIndex];
+  const firstPoke = strengthRows[firstPokemonIndex];
   console.log(`firstPoke: ${firstPoke.name}\n`);
+  strengthRows = strengthRows.filter(x => x.index != firstPoke.index);
 
   // (2) search the second pokemon which complements the first pokemon
-  let minimumCosSim = Number.MAX_VALUE;
-  let secondPoke = null;
-  strengthVectors = strengthVectors.filter(x => x.index != firstPoke.index);
-  strengthVectors.forEach(strVector => {
-    const v1 = firstPoke.vector;
-    const v2 = strVector.vector;
-    const cos = cosineSimilarity(v1, v2);
-    console.log(`${strVector.name}: ${cos}`);
-    if (cos < minimumCosSim) {
-      minimumCosSim = cos;
-      secondPoke = strVector;
-    }
-  });
-
+  const resultStep2 = searchMinimumRow(firstPoke.vector, strengthRows, (v1, v2) => cosineSimilarity(v1, v2));
+  const secondPoke = resultStep2.row;
   console.log(`secondPoke: ${secondPoke.name}\n`);
-  strengthVectors = strengthVectors.filter(x => x.index != secondPoke.index);
+  strengthRows = strengthRows.filter(x => x.index != secondPoke.index);
 
   // (3)(4) search the third and fourth pokemon which complements the first and second
   const vectorFirstAndSecond = addVector(firstPoke.vector, secondPoke.vector);
@@ -66,44 +55,34 @@ function constructTeamByIngenMethod(strengthVectors, firstPokemonIndex) {
   let thirdPoke = null;
   let fourthPoke = null;
   // temporary search all combinations
-  for (let i = 0; i < strengthVectors.length; i++) {
-    const v1 = strengthVectors[i].vector;
-    for (let j = i + 1; j < strengthVectors.length; j++) {
-      const v2 = strengthVectors[j].vector;
+  for (let i = 0; i < strengthRows.length; i++) {
+    const v1 = strengthRows[i].vector;
+    for (let j = i + 1; j < strengthRows.length; j++) {
+      const v2 = strengthRows[j].vector;
       const combinedVector = addVector(v1, v2);
       const cos = cosineSimilarity(vectorFirstAndSecond, combinedVector);
       // console.log(`${strengthVectors[i].name} + ${strengthVectors[j].name}: ${cos}`);
       if (cos < minimumCosSim) {
         minimumCosSim = cos;
-        thirdPoke = strengthVectors[i];
-        fourthPoke = strengthVectors[j];
+        thirdPoke = strengthRows[i];
+        fourthPoke = strengthRows[j];
       }
     }
   }
 
   console.log(`thirdPoke: ${thirdPoke.name}`);
   console.log(`fourthPoke: ${fourthPoke.name}\n`);
-  strengthVectors = strengthVectors.filter(x => x.index != thirdPoke.index);
-  strengthVectors = strengthVectors.filter(x => x.index != fourthPoke.index);
+  strengthRows = strengthRows.filter(x => x.index != thirdPoke.index);
+  strengthRows = strengthRows.filter(x => x.index != fourthPoke.index);
 
 
   // (5) search fifth pokemon which complements above 4 pokemons
-  minimumCosSim = Number.MAX_VALUE;
-  let fifthPoke = null;
-
   const vector4Pokemons = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector);
   console.log(JSON.stringify(vector4Pokemons))
-  strengthVectors.forEach(strVector => {
-    const cos = cosineSimilarity(vector4Pokemons, strVector.vector);
-    console.log(`${strVector.name}: ${cos}`);
-    if (cos < minimumCosSim) {
-      minimumCosSim = cos;
-      fifthPoke = strVector;
-    }
-  });
-
+  const resultStep5 = searchMinimumRow(vector4Pokemons, strengthRows, (v1, v2) => cosineSimilarity(v1, v2))
+  const fifthPoke = resultStep5.row; 
   console.log(`fifthPoke: ${fifthPoke.name}\n`);
-  strengthVectors = strengthVectors.filter(x => x.index != fifthPoke.index);
+  strengthRows = strengthRows.filter(x => x.index != fifthPoke.index);
 
   // (6) search sixth pokemon which covers the weakest pokemon of 5
   const vector5Pokemons = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector, fifthPoke.vector);
@@ -120,16 +99,8 @@ function constructTeamByIngenMethod(strengthVectors, firstPokemonIndex) {
 
   console.log(`weakest slot is ${weakestSlot}: ${weakestValue}`);
 
-  let maxStrengthToSlot = Number.MIN_VALUE;
-  let sixthPoke = null;
-  strengthVectors.forEach(strVector => {
-    const value = strVector.vector[weakestSlot];
-    if (value > maxStrengthToSlot) {
-      maxStrengthToSlot = value;
-      sixthPoke = strVector;
-    }
-  });
-
+  const resultStep6 = searchMaximumRow(null, strengthRows, (v1, v2) => v2[weakestSlot]);
+  const sixthPoke = resultStep6.row;
   console.log(`sixthPoke: ${sixthPoke.name}\n`);
 
   console.log(`${firstPoke.name} (norm: ${l2norm(firstPoke.vector)})`);
@@ -141,8 +112,29 @@ function constructTeamByIngenMethod(strengthVectors, firstPokemonIndex) {
 
   const finalVector = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector, fifthPoke.vector, sixthPoke.vector);
   console.log(JSON.stringify(finalVector));
-
 }
+
+// search the row which has the minimum value on the evaluation function
+function searchMinimumRow(targetVector, strengthRows, evaluationFunc) {
+  let minimumValue = Number.MAX_VALUE;
+  let minimumRow = null;
+  strengthRows.forEach(strRow => {
+    const val = evaluationFunc(targetVector, strRow.vector);
+    console.log(`${strRow.name}: ${val}`);
+    if (val < minimumValue) {
+      minimumValue = val;
+      minimumRow = strRow;
+    }
+  });
+
+  return { row: minimumRow, value: minimumValue };
+}
+
+function searchMaximumRow(targetVector, strengthRows, evaluationFunc) {
+  const inverseEvalFunc = (v1, v2) => -1 * evaluationFunc(v1, v2);
+  return searchMinimumRow(targetVector, strengthRows, inverseEvalFunc);
+}
+
 
 function addVectors() {
   const length = arguments[0].length;
