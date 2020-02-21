@@ -49,21 +49,33 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   console.log(`secondPoke: ${secondPoke.name}\n`);
   strengthRows = strengthRows.filter(x => x.index != secondPoke.index);
 
-  // (3)(4) search the third and fourth pokemon which complements the first and second
+  // (3)(4) search the third and fourth pokemon which cover weak slots of the first and second
   const vectorFirstAndSecond = addVector(firstPoke.vector, secondPoke.vector);
-  minimumCosSim = Number.MAX_VALUE;
+  console.log(JSON.stringify(vectorFirstAndSecond))
+  let maximumValueStep34 = Number.MIN_VALUE;
   let thirdPoke = null;
   let fourthPoke = null;
   // temporary search all combinations
   for (let i = 0; i < strengthRows.length; i++) {
-    const v1 = strengthRows[i].vector;
     for (let j = i + 1; j < strengthRows.length; j++) {
-      const v2 = strengthRows[j].vector;
-      const combinedVector = addVector(v1, v2);
-      const cos = cosineSimilarity(vectorFirstAndSecond, combinedVector);
-      // console.log(`${strengthVectors[i].name} + ${strengthVectors[j].name}: ${cos}`);
-      if (cos < minimumCosSim) {
-        minimumCosSim = cos;
+      const cropedV1 = [];
+      const cropedV2 = [];
+      for (let k = 0; k < vectorFirstAndSecond.length; k++) {
+        if (vectorFirstAndSecond[k] < 0) {
+          cropedV1.push(strengthRows[i].vector[k]);
+          cropedV2.push(strengthRows[j].vector[k]);
+        }
+      }
+
+      const combinedVector = addVector(cropedV1, cropedV2);
+      const cos = cosineSimilarity(cropedV1, cropedV2);
+      const absSin = Math.sqrt(1 - cos * cos);
+      const product = dotProduct(combinedVector, combinedVector.map(x => 1.0));
+      const value = product * absSin;
+
+      console.log(`${strengthRows[i].name} + ${strengthRows[j].name}: ${value}(${product} * ${absSin}`);
+      if (value > maximumValueStep34) {
+        maximumValueStep34 = value;
         thirdPoke = strengthRows[i];
         fourthPoke = strengthRows[j];
       }
@@ -76,11 +88,28 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   strengthRows = strengthRows.filter(x => x.index != fourthPoke.index);
 
 
-  // (5) search fifth pokemon which complements above 4 pokemons
+  // (5) search fifth pokemon which covers weak slots of above 4 pokemons
   const vector4Pokemons = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector);
   console.log(JSON.stringify(vector4Pokemons))
-  const resultStep5 = searchMinimumRow(vector4Pokemons, strengthRows, (v1, v2) => cosineSimilarity(v1, v2))
-  const fifthPoke = resultStep5.row; 
+  let maximumValueStep5 = Number.MIN_VALUE;
+  for (let i = 0; i < strengthRows.length; i++) {
+    const cropedV1 = [];
+    for (let j = 0; j < vector4Pokemons.length; j++) {
+      if (vector4Pokemons[j] < 0) {
+        cropedV1.push(strengthRows[i].vector[j]);
+      }
+    }
+
+    const product = dotProduct(cropedV1, cropedV1.map(x => 1.0));
+    const value = product;
+
+    console.log(`${strengthRows[i].name}: ${value}`);
+    if (value > maximumValueStep5) {
+      maximumValueStep5 = value;
+      fifthPoke = strengthRows[i];
+    }
+  }
+
   console.log(`fifthPoke: ${fifthPoke.name}\n`);
   strengthRows = strengthRows.filter(x => x.index != fifthPoke.index);
 
@@ -103,12 +132,12 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   const sixthPoke = resultStep6.row;
   console.log(`sixthPoke: ${sixthPoke.name}\n`);
 
-  console.log(`${firstPoke.name} (norm: ${l2norm(firstPoke.vector)})`);
-  console.log(`${secondPoke.name} (norm: ${l2norm(secondPoke.vector)})`);
-  console.log(`${thirdPoke.name} (norm: ${l2norm(thirdPoke.vector)})`);
-  console.log(`${fourthPoke.name} (norm: ${l2norm(fourthPoke.vector)})`);
-  console.log(`${fifthPoke.name} (norm: ${l2norm(fifthPoke.vector)})`);
-  console.log(`${sixthPoke.name} (norm: ${l2norm(sixthPoke.vector)})`);
+  console.log(`${firstPoke.name} (norm: ${dotProduct(firstPoke.vector, firstPoke.vector.map(x => 1))})`);
+  console.log(`${secondPoke.name} (norm: ${dotProduct(secondPoke.vector, secondPoke.vector.map(x => 1))})`);
+  console.log(`${thirdPoke.name} (norm: ${dotProduct(thirdPoke.vector, thirdPoke.vector.map(x => 1))})`);
+  console.log(`${fourthPoke.name} (norm: ${dotProduct(fourthPoke.vector, fourthPoke.vector.map(x => 1))})`);
+  console.log(`${fifthPoke.name} (norm: ${dotProduct(fifthPoke.vector, fifthPoke.vector.map(x => 1))})`);
+  console.log(`${sixthPoke.name} (norm: ${dotProduct(sixthPoke.vector, sixthPoke.vector.map(x => 1))})`);
 
   const finalVector = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector, fifthPoke.vector, sixthPoke.vector);
   console.log(JSON.stringify(finalVector));
