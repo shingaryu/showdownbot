@@ -60,7 +60,7 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
     const evalRecord = [];
     for (let j = 0; j < targetsHorizontal.length; j++) {
       const oppPoke = targetsHorizontal[j];
-      logger.info(`evaluate about ${myPoke.name} vs ${oppPoke.name}`);
+      logger.info(`evaluate about ${myPoke.species} vs ${oppPoke.species}`);
       const repeatedOneOnOneValues = []; 
       for (let k = 0; k < oneOnOneRepetition; k++) {
         const evalValuesForBothSide = [];
@@ -75,7 +75,7 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
           const decision = BattleRoom.parseRequest(battle.p1.request);
           const minimaxDecision = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth);
           try {
-            fs.writeFileSync(`./${rootDir}/Decision Logs/(${i})${myPoke.name}-(${j})${oppPoke.name}_${k}_${l}.json`, JSON.stringify(minimaxDecision));
+            fs.writeFileSync(`./${rootDir}/Decision Logs/(${i})${myPoke.species}-(${j})${oppPoke.species}_${k}_${l}.json`, JSON.stringify(minimaxDecision));
           } catch (e) {
             logger.warn('failed to save decision data!');
             logger.warn(e);
@@ -102,19 +102,19 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
 	logger.debug("evaluation value table is below: ");
 	let tableHeader = '        ,';
 	targetsHorizontal.forEach(oppPoke => {
-			tableHeader += oppPoke.name + ',';
+			tableHeader += oppPoke.species + ',';
 	});
 	console.log(tableHeader);
 	for (let i = 0; i < targetsVertical.length; i++) {
 			let tableRecord = '';
-			tableRecord += targetsVertical[i].name + ',';
+			tableRecord += targetsVertical[i].species + ',';
 			evalValueTable[i].forEach(evalValue => {
 					tableRecord += evalValue.toFixed() + ',';
 			});
 			console.log(tableRecord);
   }
   
-  writeEvalTable(evalValueTable, targetsVertical.map(x => x.name), targetsHorizontal.map(x => x.name),
+  writeEvalTable(evalValueTable, targetsVertical.map(x => x.species), targetsHorizontal.map(x => x.species),
     `./${rootDir}/Outputs/str_table_${oneOnOneRepetition}_${minimaxDepth}_${minimaxRepetiton}_${moment().format('YYYYMMDDHHmmss')}.csv`);
 }
 
@@ -147,7 +147,7 @@ function validatePokemonSets(teamValidator, pokemonSets) {
   pokemonSets.forEach(pokemonSet => {
     const setValidationProblems = teamValidator.validateSet(pokemonSet);
     if (setValidationProblems) {
-      logger.error(`${setValidationProblems.length} problem(s) is found about ${pokemonSet.name} during the validation.`);
+      logger.error(`${setValidationProblems.length} problem(s) is found about ${pokemonSet.species} during the validation.`);
       setValidationProblems.forEach(problem => {
         logger.error(problem);
       })
