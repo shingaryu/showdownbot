@@ -33,46 +33,23 @@ makeStrengthTable(weights, 1, 1, 1);
 // makeStrengthTable(weights, 100, 3, 1);
 
 function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 1) {
-  const dirName = 'strength-table';
-  const filenames = fs.readdirSync('./' + dirName);
+  const rootDir = 'strength-table';
+  const targetPokemonDir = 'Target Pokemons';
+  const teamPokemonDir = 'Team Pokemons';
 
   const customGameFormat = Dex.getFormat(`gen8customgame`, true);
   customGameFormat.ruleset = customGameFormat.ruleset.filter(rule => rule !== 'Team Preview');
   customGameFormat.forcedLevel = 50;
-
   const teamValidator = new TeamValidator(customGameFormat);
-  const targetPokemons = [];
 
-  // Read target pokemon sets from team text. If an error occurs, just skip the file and continue.
-  filenames.forEach(filename => {
-    try {
-      const rawText = fs.readFileSync(`./${dirName}/${filename}`, "utf8");
-      const pokemonSets = importTeam(rawText); 
-      if (!pokemonSets) {
-        logger.warn(`'${filename}' doesn't contain a valid pokemon expression. We will just ignore this file.`);
-      } else if (pokemonSets.length > 1) {
-        logger.warn(`'${filename}' seems to have more than one pokemon expression. Subsequent ones are ignored.`);
-      }
-      targetPokemons.push(pokemonSets[0]);
-    } catch (error) {
-      logger.warn(`Failed to import '${filename}'. Is this a text of a target pokemon?`);
-    }
-  });
+  const targetPokemons = loadPokemonSetsFromTexts(`./${rootDir}/${targetPokemonDir}`);
+  const teamPokemons = loadPokemonSetsFromTexts(`./${rootDir}/${teamPokemonDir}`);
+  validatePokemonSets(teamValidator, targetPokemons);
+  validatePokemonSets(teamValidator, teamPokemons);
 
-  // Validate pokemon sets. If the validation failed about one of target pokemons, throw an exception.
-  targetPokemons.forEach(targetPokemon => {
-    const setValidationProblems = teamValidator.validateSet(targetPokemon);
-    if (setValidationProblems) {
-      logger.error(`${setValidationProblems.length} problem(s) is found about ${targetPokemon.name} during the validation.`);
-      setValidationProblems.forEach(problem => {
-        logger.error(problem);
-      })
-      throw new Error('Pokemon Set Validation Error');
-    }  
-  })
-
+  logger.info(teamPokemons.length + ' team pokemons are loaded.');
   logger.info(targetPokemons.length + ' target pokemons are loaded.');
-  const targetsVertical = [...targetPokemons];
+  const targetsVertical = [...teamPokemons];
   const targetsHorizontal = [...targetPokemons];
 
   logger.info("start evaluating One-On-One strength...")
@@ -86,22 +63,28 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
       logger.info(`evaluate about ${myPoke.name} vs ${oppPoke.name}`);
       const repeatedOneOnOneValues = []; 
       for (let k = 0; k < oneOnOneRepetition; k++) {
-        const p1 = { name: 'botPlayer', avatar: 1, team: [myPoke] };
-        const p2 = { name: 'humanPlayer', avatar: 1, team: [oppPoke] };								
-        const battleOptions = { format: customGameFormat, rated: false, send: null, p1, p2 };
-        const battle = new PcmBattle(battleOptions);
-        battle.start();              
-        battle.makeRequest();                   
-        const decision = BattleRoom.parseRequest(battle.p1.request);
-        const minimaxDecision = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth);
-        try {
-          fs.writeFileSync(`./${dirName}/Decision Logs/(${i})${myPoke.name}-(${j})${oppPoke.name}_${k}.json`, JSON.stringify(minimaxDecision));
-        } catch (e) {
-          logger.warn('failed to save decision data!');
-          logger.warn(e);
+        const evalValuesForBothSide = [];
+        // to avoid asymmetry about evaluation value for some reasons
+        for (let l = 0; l < 2; l++) {
+          const p1 = { name: 'botPlayer', avatar: 1, team: l === 0? [myPoke]:[oppPoke] };
+          const p2 = { name: 'humanPlayer', avatar: 1, team: l === 0? [oppPoke]:[myPoke] };								
+          const battleOptions = { format: customGameFormat, rated: false, send: null, p1, p2 };
+          const battle = new PcmBattle(battleOptions);
+          battle.start();              
+          battle.makeRequest();                   
+          const decision = BattleRoom.parseRequest(battle.p1.request);
+          const minimaxDecision = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth);
+          try {
+            fs.writeFileSync(`./${rootDir}/Decision Logs/(${i})${myPoke.name}-(${j})${oppPoke.name}_${k}_${l}.json`, JSON.stringify(minimaxDecision));
+          } catch (e) {
+            logger.warn('failed to save decision data!');
+            logger.warn(e);
+          }
+
+          evalValuesForBothSide.push(minimaxDecision.tree.value);
         }
 
-        const evalValue = minimaxDecision.tree.value;
+        const evalValue = (evalValuesForBothSide[0] - evalValuesForBothSide[1]) / 2;
         repeatedOneOnOneValues.push(evalValue);
       }
 
@@ -115,8 +98,6 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
 
     evalValueTable.push(evalRecord);
   }
-
-  averageDiagonalElements(evalValueTable);
 
 	logger.debug("evaluation value table is below: ");
 	let tableHeader = '        ,';
@@ -134,7 +115,45 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
   }
   
   writeEvalTable(evalValueTable, targetsVertical.map(x => x.name), targetsHorizontal.map(x => x.name),
-    `./${dirName}/Outputs/str_table_${oneOnOneRepetition}_${minimaxDepth}_${minimaxRepetiton}_${moment().format('YYYYMMDDHHmmss')}.csv`);
+    `./${rootDir}/Outputs/str_table_${oneOnOneRepetition}_${minimaxDepth}_${minimaxRepetiton}_${moment().format('YYYYMMDDHHmmss')}.csv`);
+}
+
+// Read target pokemon sets from team text. If an error occurs, just skip the file and continue.
+function loadPokemonSetsFromTexts(directoryPath) {
+  const filenames = fs.readdirSync(directoryPath);
+  const pokemons = [];
+
+  filenames.forEach(filename => {
+    try {
+      const rawText = fs.readFileSync(`${directoryPath}/${filename}`, "utf8");
+      const pokemonSets = importTeam(rawText); 
+      if (!pokemonSets) {
+        logger.warn(`'${filename}' doesn't contain a valid pokemon expression. We will just ignore this file.`);
+      } else if (pokemonSets.length > 1) {
+        logger.warn(`'${filename}' seems to have more than one pokemon expression. Subsequent ones are ignored.`);
+      }
+      pokemons.push(pokemonSets[0]);
+    } catch (error) {
+      logger.warn(`Failed to import '${filename}'. Is this a text of a target pokemon?`);
+      logger.warn(error);
+    }
+  });
+
+  return pokemons;
+}
+
+// Validate pokemon sets. If the validation failed about one of target pokemons, throw an exception.
+function validatePokemonSets(teamValidator, pokemonSets) {
+  pokemonSets.forEach(pokemonSet => {
+    const setValidationProblems = teamValidator.validateSet(pokemonSet);
+    if (setValidationProblems) {
+      logger.error(`${setValidationProblems.length} problem(s) is found about ${pokemonSet.name} during the validation.`);
+      setValidationProblems.forEach(problem => {
+        logger.error(problem);
+      })
+      throw new Error('Pokemon Set Validation Error');
+    }  
+  })
 }
 
 function stdDev(values) {
@@ -154,25 +173,6 @@ function variance(values, average) {
 	let sum = 0;
 	values.forEach(value => sum += Math.pow(value - average, 2));
 	return sum / values.length;
-}
-
-function averageDiagonalElements(evalValueTable) {
-  if (evalValueTable.some(row => row.length !== evalValueTable.length)) {
-    throw new Error('Table needs to be square');
-  }
-
-  for (let i = 0; i < evalValueTable.length; i++) {
-    for (let j = i; j < evalValueTable[i].length; j++) {
-      if (i === j) {
-        evalValueTable[i][j] = 0;
-      } else {
-        const valueIJ = evalValueTable[i][j];
-        const valueJI = evalValueTable[j][i];
-        evalValueTable[i][j] = (valueIJ - valueJI) / 2;
-        evalValueTable[j][i] = (valueJI - valueIJ) / 2;
-      }
-    }
-  }
 }
 
 function writeEvalTable(evalValueTable, rowHeader, columnHeader, filename) {
