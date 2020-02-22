@@ -1,24 +1,30 @@
 const fs = require('fs');
+
 const filename = 'strength-table.csv';
 const strategiesFilename = 'strategies.csv';
 
-const src = fs.createReadStream(`combination-calculator/${filename}`, 'utf8');
-let tableRows = [];
-src.on('data', row => {
-  tableRows = row.split('\n');
-})
-src.on('end', () => {
-  let numberOfValues = -1;
+const strengthRows = loadStrengthTable(`combination-calculator/${filename}`);
+console.log(`strength table is successfully loaded`);
+loadStrategyInfoToStrTable(`./combination-calculator/${strategiesFilename}`, strengthRows);
+console.log(`strategy information is successfully loaded`);
+
+constructTeamByIngenMethod(strengthRows, 2);
+
+function loadStrengthTable(filepath) {
+  const tableText = fs.readFileSync(filepath, 'utf8');
+  let tableRows = tableText.split('\n');
+    
+  console.log(`${tableRows.length} rows are loaded`);
+  const columns = tableRows[0].split(',').slice(1).filter(x => !isEmptyString(x));
+  console.log(`${columns.length} columns exist`);
+  
   let strengthRows = []; 
   let index = 0;
-
-  console.log(`${tableRows.length} rows are loaded`);
   tableRows.slice(1).forEach(row => {
-    console.log(row);
     if (!row) {
       return;
     }
-
+  
     if (row.split(',').every(x => isEmptyString(x))) {
       return;
     }
@@ -27,21 +33,23 @@ src.on('end', () => {
     strengthRow['index'] = index++;
     strengthRow['name'] = records[0].trim();
     const values = records.slice(1).filter(x => !isEmptyString(x));
-    if (numberOfValues === -1) {
-      numberOfValues = values.length;
-      console.log(`length of strength vector: ${numberOfValues}`);
-    } else {
-      if (numberOfValues !== values.length) {
-        throw new Error('error: the number of column is not same among all rows');
-      }
+    if (columns.length !== values.length) {
+      throw new Error('error: the number of column is not same among all rows');
     }
     strengthRow['vector'] = values.map(v => parseFloat(v.trim()));
   
     strengthRows.push(strengthRow);
   });
 
-  const strategiesText = fs.readFileSync(`./combination-calculator/${strategiesFilename}`, 'utf8');
+  return strengthRows;
+}
+
+// load strategy info from text and add params to strength table
+function loadStrategyInfoToStrTable(filepath, strengthRows) {
+  const strategiesText = fs.readFileSync(filepath, 'utf8');
   const strategiesRows = strategiesText.split('\n');
+
+
   strategiesRows.slice(1).forEach(strategiesRow => {
     if (strategiesRow.split(',').every(x => isEmptyString(x))) {
       return;
@@ -88,11 +96,7 @@ src.on('end', () => {
       throw new Error(`error: strategy type of pokemon ${x.name} is not set`);
     }
   });
-
-  console.log(`strategy information is successfully loaded`);
-
-  constructTeamByIngenMethod(strengthRows, 2);
-})
+}
 
 function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   // (1) select the first pokemon
@@ -133,7 +137,7 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
       const product = dotProduct(combinedVector, combinedVector.map(x => 1.0));
       const value = product * absSin;
 
-      console.log(`${filteredStrRows34[i].name} + ${filteredStrRows34[j].name}: ${value}(${product} * ${absSin}`);
+      console.log(`${filteredStrRows34[i].name} + ${filteredStrRows34[j].name}: ${value}(${product} * ${absSin})`);
       if (value > maximumValueStep34) {
         maximumValueStep34 = value;
         thirdPoke = filteredStrRows34[i];
