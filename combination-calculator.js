@@ -156,7 +156,7 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   const firstPoke = strengthRows[firstPokemonIndex];
   console.log(`firstPoke: ${firstPoke.name}\n`);
   strengthRows = strengthRows.filter(x => x.index != firstPoke.index);
-  const compatibleStrTypes = compatibleTypes(firstPoke.strategyType);
+  let compatibleStrTypes = compatibleTypes(firstPoke.strategyType);
 
   // (2) search the second pokemon which complements the first pokemon
   const resultStep2 = searchMinimumRow(firstPoke.vector, 
@@ -164,6 +164,10 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   const secondPoke = resultStep2.row;
   console.log(`secondPoke: ${secondPoke.name}\n`);
   strengthRows = strengthRows.filter(x => x.index != secondPoke.index);
+  // because type `tank` doesn't affect compatible strategy types, now we set it again with second poke
+  if (firstPoke.strategyType === 'Tank') {
+    compatibleStrTypes = compatibleTypes(secondPoke.strategyType);
+  }
 
   // (3)(4) search the third and fourth pokemon which cover weak slots of the first and second
   const vectorFirstAndSecond = addVector(firstPoke.vector, secondPoke.vector);
