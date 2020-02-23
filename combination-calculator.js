@@ -2,19 +2,24 @@ const fs = require('fs');
 
 const filename = 'strength-table.csv';
 const strategiesFilename = 'strategies.csv';
+const usageFilename = 'usage.csv';
 
-const strengthRows = loadStrengthTable(`combination-calculator/${filename}`);
+
+const loadStrTableResult = loadStrengthTable(`combination-calculator/${filename}`);
+const strengthRows = loadStrTableResult.strengthRows;
+const columns = loadStrTableResult.columns;
 console.log(`strength table is successfully loaded`);
 loadStrategyInfoToStrTable(`./combination-calculator/${strategiesFilename}`, strengthRows);
 console.log(`strategy information is successfully loaded`);
+loadUsageInfo(`./combination-calculator/${usageFilename}`, columns, strengthRows)
 
-constructTeamByIngenMethod(strengthRows, 2);
+constructTeamByIngenMethod(strengthRows, 24);
 
 function loadStrengthTable(filepath) {
-  const tableText = fs.readFileSync(filepath, 'utf8');
+  let tableText = fs.readFileSync(filepath, 'utf8');
+  tableText = tableText.replace('\r\n', '\n');
   let tableRows = tableText.split('\n');
     
-  console.log(`${tableRows.length} rows are loaded`);
   const columns = tableRows[0].split(',').slice(1).filter(x => !isEmptyString(x));
   console.log(`${columns.length} columns exist`);
   
@@ -36,19 +41,22 @@ function loadStrengthTable(filepath) {
     if (columns.length !== values.length) {
       throw new Error('error: the number of column is not same among all rows');
     }
+    strengthRow['originalVector'] = values.map(v => parseFloat(v.trim()));
     strengthRow['vector'] = values.map(v => parseFloat(v.trim()));
-  
+    
     strengthRows.push(strengthRow);
   });
 
-  return strengthRows;
+  console.log(`${strengthRows.length} rows are loaded`);
+
+  return { columns, strengthRows};
 }
 
 // load strategy info from text and add params to strength table
 function loadStrategyInfoToStrTable(filepath, strengthRows) {
-  const strategiesText = fs.readFileSync(filepath, 'utf8');
+  let strategiesText = fs.readFileSync(filepath, 'utf8');
+  strategiesText = strategiesText.replace('\r\n', '\n');
   const strategiesRows = strategiesText.split('\n');
-
 
   strategiesRows.slice(1).forEach(strategiesRow => {
     if (strategiesRow.split(',').every(x => isEmptyString(x))) {
@@ -96,6 +104,51 @@ function loadStrategyInfoToStrTable(filepath, strengthRows) {
       throw new Error(`error: strategy type of pokemon ${x.name} is not set`);
     }
   });
+}
+
+function loadUsageInfo(filepath, columns, strengthRows) {
+  let usageText = fs.readFileSync(filepath, 'utf8');
+  usageText = usageText.replace('\r\n', '\n');
+
+  const usageRows = usageText.split('\n');
+  const usageInfo = [];
+  const usageMap = new Map();
+  usageRows.slice(1).forEach(row => {
+    if (!row) {
+      return;
+    }
+  
+    if (row.split(',').every(x => isEmptyString(x))) {
+      return;
+    }
+  
+    const records = row.split(',');
+    if (records.length < 2) {
+      throw new Error('error: invalid usage records');
+    }
+  
+    const name = records[0].trim();
+    const usage = parseFloat(records[1].trim());
+    usageMap.set(name, usage);
+  
+    usageInfo.push({name, usage});
+  });
+  
+  const usageBaseRatio = [];
+  for (let i = 0; i < columns.length; i++) {
+    if (usageMap.get(columns[i]) === undefined) {
+      throw new Error(`error: usage information for pokemon ${columns[i]} is not found`);
+    }
+
+    const duplicateCounts = columns.filter(x => x === columns[i]).length;
+    usageBaseRatio[i] = usageMap.get(columns[i]) / duplicateCounts;
+  }
+
+  strengthRows.forEach(row => {
+    for (let i = 0; i < columns.length; i++) {
+      row.vector[i] *= (usageBaseRatio[i] / 100);
+    }
+  })
 }
 
 function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
@@ -192,7 +245,7 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
     }
   }
 
-  console.log(`weakest slot is ${weakestSlot}: ${weakestValue}`);
+  console.log(`weakest slot is ${weakestSlot}(${columns[weakestSlot]}): ${weakestValue}`);
 
   const resultStep6 = searchMaximumRow(null, strengthRows, (v1, v2) => v2[weakestSlot]);
   const sixthPoke = resultStep6.row;
