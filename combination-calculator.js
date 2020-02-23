@@ -47,6 +47,26 @@ function loadStrengthTable(filepath) {
     strengthRows.push(strengthRow);
   });
 
+  // normalize
+  let min = Number.MAX_SAFE_INTEGER;
+  let max = Number.MIN_SAFE_INTEGER;
+  strengthRows.forEach(row => {
+    row.originalVector.forEach(v => {
+      if (v < min) {
+        min = v;
+      }
+
+      if (v > max) {
+        max = v;
+      }
+    })
+  });
+
+  for (let i = 0; i < strengthRows.length; i++) {
+    const row = strengthRows[i];
+    row.vector = row.vector.map(v => (v - min) / (max - min));
+  }
+
   console.log(`${strengthRows.length} rows are loaded`);
 
   return { columns, strengthRows};
@@ -182,19 +202,19 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
       const cropedV1 = [];
       const cropedV2 = [];
       for (let k = 0; k < vectorFirstAndSecond.length; k++) {
-        if (vectorFirstAndSecond[k] < 0) {
+        if (vectorFirstAndSecond[k] < 0.5 * 2) {
           cropedV1.push(filteredStrRows34[i].vector[k]);
           cropedV2.push(filteredStrRows34[j].vector[k]);
         }
       }
 
-      const combinedVector = addVector(cropedV1, cropedV2);
       const cos = cosineSimilarity(cropedV1, cropedV2);
       const absSin = Math.sqrt(1 - cos * cos);
-      const product = dotProduct(combinedVector, combinedVector.map(x => 1.0));
-      const value = product * absSin;
+      const p1 = l2norm(cropedV1);
+      const p2 = l2norm(cropedV2);
+      const value = p1 * p2 * absSin;
 
-      console.log(`${filteredStrRows34[i].name} + ${filteredStrRows34[j].name}: ${value}(${product} * ${absSin})`);
+      console.log(`${filteredStrRows34[i].name} + ${filteredStrRows34[j].name}: ${value}(${p1} * ${p2} * ${absSin})`);
       if (value > maximumValueStep34) {
         maximumValueStep34 = value;
         thirdPoke = filteredStrRows34[i];
@@ -218,13 +238,12 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   for (let i = 0; i < filteredStrRows5.length; i++) {
     const cropedV1 = [];
     for (let j = 0; j < vector4Pokemons.length; j++) {
-      if (vector4Pokemons[j] < 0) {
+      if (vector4Pokemons[j] < 0.5 * 4) {
         cropedV1.push(filteredStrRows5[i].vector[j]);
       }
     }
 
-    const product = dotProduct(cropedV1, cropedV1.map(x => 1.0));
-    const value = product;
+    const value = l2norm(cropedV1);
 
     console.log(`${filteredStrRows5[i].name}: ${value}`);
     if (value > maximumValueStep5) {
@@ -255,12 +274,12 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   const sixthPoke = resultStep6.row;
   console.log(`sixthPoke: ${sixthPoke.name}\n`);
 
-  console.log(`${firstPoke.name} (norm: ${dotProduct(firstPoke.vector, firstPoke.vector.map(x => 1))})`);
-  console.log(`${secondPoke.name} (norm: ${dotProduct(secondPoke.vector, secondPoke.vector.map(x => 1))})`);
-  console.log(`${thirdPoke.name} (norm: ${dotProduct(thirdPoke.vector, thirdPoke.vector.map(x => 1))})`);
-  console.log(`${fourthPoke.name} (norm: ${dotProduct(fourthPoke.vector, fourthPoke.vector.map(x => 1))})`);
-  console.log(`${fifthPoke.name} (norm: ${dotProduct(fifthPoke.vector, fifthPoke.vector.map(x => 1))})`);
-  console.log(`${sixthPoke.name} (norm: ${dotProduct(sixthPoke.vector, sixthPoke.vector.map(x => 1))})`);
+  console.log(`${firstPoke.name} (norm: ${l2norm(firstPoke.vector)})`);
+  console.log(`${secondPoke.name} (norm: ${l2norm(secondPoke.vector)})`);
+  console.log(`${thirdPoke.name} (norm: ${l2norm(thirdPoke.vector)})`);
+  console.log(`${fourthPoke.name} (norm: ${l2norm(fourthPoke.vector)})`);
+  console.log(`${fifthPoke.name} (norm: ${l2norm(fifthPoke.vector)})`);
+  console.log(`${sixthPoke.name} (norm: ${l2norm(sixthPoke.vector)})`);
 
   const finalVector = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector, fifthPoke.vector, sixthPoke.vector);
   console.log(JSON.stringify(finalVector));
