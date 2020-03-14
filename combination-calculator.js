@@ -11,7 +11,7 @@ const columns = loadStrTableResult.columns;
 console.log(`strength table is successfully loaded`);
 loadStrategyInfoToStrTable(`./combination-calculator/${strategiesFilename}`, strengthRows);
 console.log(`strategy information is successfully loaded`);
-loadUsageInfo(`./combination-calculator/${usageFilename}`, columns, strengthRows)
+// loadUsageInfo(`./combination-calculator/${usageFilename}`, columns, strengthRows)
 
 constructTeamByIngenMethod(strengthRows, 24);
 
@@ -172,9 +172,13 @@ function loadUsageInfo(filepath, columns, strengthRows) {
 }
 
 function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
+  const team = [];
+
   // (1) select the first pokemon
   const firstPoke = strengthRows[firstPokemonIndex];
   console.log(`firstPoke: ${firstPoke.name}\n`);
+  team.push(firstPoke);
+  console.log(JSON.stringify(teamStrengthValues(team)).replace('[', '').replace(']', ''));
   strengthRows = strengthRows.filter(x => x.index != firstPoke.index);
   let compatibleStrTypes = compatibleTypes(firstPoke.strategyType);
 
@@ -183,6 +187,9 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
     filterStrengthRows(compatibleStrTypes, strengthRows), (v1, v2) => cosineSimilarity(v1, v2));
   const secondPoke = resultStep2.row;
   console.log(`secondPoke: ${secondPoke.name}\n`);
+  team.push(secondPoke);
+  console.log(JSON.stringify(teamStrengthValues(team)).replace('[', '').replace(']', ''));
+
   strengthRows = strengthRows.filter(x => x.index != secondPoke.index);
   // because type `tank` doesn't affect compatible strategy types, now we set it again with second poke
   if (firstPoke.strategyType === 'Tank') {
@@ -225,6 +232,10 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
 
   console.log(`thirdPoke: ${thirdPoke.name}`);
   console.log(`fourthPoke: ${fourthPoke.name}\n`);
+  team.push(thirdPoke);
+  team.push(fourthPoke);
+  console.log(JSON.stringify(teamStrengthValues(team)).replace('[', '').replace(']', ''));
+
   strengthRows = strengthRows.filter(x => x.index != thirdPoke.index);
   strengthRows = strengthRows.filter(x => x.index != fourthPoke.index);
 
@@ -253,6 +264,9 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   }
 
   console.log(`fifthPoke: ${fifthPoke.name}\n`);
+  team.push(fifthPoke);
+  console.log(JSON.stringify(teamStrengthValues(team)).replace('[', '').replace(']', ''));
+
   strengthRows = strengthRows.filter(x => x.index != fifthPoke.index);
 
   // (6) search sixth pokemon which covers the weakest pokemon of 5
@@ -273,6 +287,9 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   const resultStep6 = searchMaximumRow(null, strengthRows, (v1, v2) => v2[weakestSlot]);
   const sixthPoke = resultStep6.row;
   console.log(`sixthPoke: ${sixthPoke.name}\n`);
+  team.push(sixthPoke);
+  console.log(JSON.stringify(teamStrengthValues(team)).replace('[', '').replace(']', ''));
+
 
   console.log(`${firstPoke.name} (norm: ${l2norm(firstPoke.vector)})`);
   console.log(`${secondPoke.name} (norm: ${l2norm(secondPoke.vector)})`);
@@ -282,7 +299,7 @@ function constructTeamByIngenMethod(strengthRows, firstPokemonIndex) {
   console.log(`${sixthPoke.name} (norm: ${l2norm(sixthPoke.vector)})`);
 
   const finalVector = addVectors(firstPoke.vector, secondPoke.vector, thirdPoke.vector, fourthPoke.vector, fifthPoke.vector, sixthPoke.vector);
-  console.log(JSON.stringify(finalVector));
+  // console.log(JSON.stringify(finalVector));
 }
 
 // search the row which has the minimum value on the evaluation function
@@ -388,4 +405,10 @@ function compatibleTypes(strategyType) {
 
 function filterStrengthRows(acceptableTypes, strengthRows) {
   return strengthRows.filter(x => acceptableTypes.indexOf(x.strategyType) >= 0);
+}
+
+function teamStrengthValues(team) {
+  const combinedVector = addVectors(...team.map(poke => poke.originalVector));
+
+  return combinedVector;
 }
