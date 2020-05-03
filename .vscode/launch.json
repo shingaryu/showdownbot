@@ -46,5 +46,12 @@
             ],
             "console": "integratedTerminal",
         },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch matchup calculation",
+            "program": "${workspaceFolder}\\matchup-evaluation\\calc-matchup-evaluations.js",
+            "console": "integratedTerminal",
+        },
     ]
 }
