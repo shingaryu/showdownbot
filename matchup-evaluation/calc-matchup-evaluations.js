@@ -17,7 +17,7 @@ const cloneBattle = require('../util').cloneBattle;
 const initLog4js = require('../initLog4js');
 const moment = require('moment');
 
-const MySqlService = require('./mysql-service').MySqlService;
+const SqlService = require('./sql-service').SqlService;
 const validatePokemonSets = require('./team-validate-service').validatePokemonSets;
 
 // Setup Logging
@@ -32,9 +32,9 @@ const weights = {
 calcMatupFromIdSets(weights, global.program.numoftrials, global.program.depth, 1);
 
 async function calcMatupFromIdSets (weights, oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 1) {
-  const mySqlService = new MySqlService();
+  const sqlService = new SqlService();
   const calculatedAt = moment().format('YYYY-MM-DD HH:mm:ss');  
-  const targetStrategyIdSets = await mySqlService.fetchTargetStrategyIdSets();
+  const targetStrategyIdSets = await sqlService.fetchTargetStrategyIdSets();
 
     for (let i = 0; i < targetStrategyIdSets.length; i++) {
       const idSet = targetStrategyIdSets[i];
@@ -133,7 +133,7 @@ async function calcMatupFromIdSets (weights, oneOnOneRepetition, minimaxDepth, m
        const cv = stdD / Math.abs(ave);
  
        logger.info(`Matchup strength: ${ave} (stddev: ${stdD}, C.V.: ${cv})`);  
-       const results = await mySqlService.insertMatchupEvaluation(idSet.str1_id, idSet.str2_id, ave, calculatedAt);
+       const results = await sqlService.insertMatchupEvaluation(idSet.str1_id, idSet.str2_id, ave, calculatedAt);
        logger.info('Inserted to DB');
        console.log(results)
    }

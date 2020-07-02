@@ -1,23 +1,13 @@
-const fs = require('fs');
-const mysql = require('mysql');
 const { v4: uuidv4 } = require('uuid');
+const { PostgresRepositoryBase } = require('./postgresRepositoryBase');
 
-class MySqlService {
+class SqlService extends PostgresRepositoryBase {
   constructor() {
-    const mysqlCredentials = JSON.parse(fs.readFileSync('./matchup-evaluation/mysql-credentials.json'));
-
-    this.connection = mysql.createConnection({
-      host     : mysqlCredentials.host,
-      user     : mysqlCredentials.user,
-      password : mysqlCredentials.password,
-      database : 'pokemon_matchup_store'
-    });
-   
-    this.connection.connect();
+    super();
   }
 
   endConnection() {
-    this.connection.end();
+    this.client.end();
   }
 
   insertPokemonStrategy(poke) {
@@ -175,18 +165,6 @@ class MySqlService {
     
     return `'${text.replace('\'', '\'\'')}'`;
   }
-
-  sqlQueryPromise(statement) {
-    return new Promise((resolve, reject) => {
-      this.connection.query(statement, (err, results, fields) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(results, fields);
-        }
-      });
-    });
-  }
 }
 
-module.exports.MySqlService = MySqlService;
+module.exports.SqlService = SqlService;

@@ -11,4 +11,4 @@ team6g.txt
 team8g.txt
 strength-table/
 matchup-evaluation/matchup-candidates/
-matchup-evaluation/mysql-credentials.json
+matchup-evaluation/postgres-credentials.json

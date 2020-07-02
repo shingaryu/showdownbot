@@ -7,10 +7,10 @@ global.Dex = require('../showdown-sources/.sim-dist/dex').Dex;
 global.toId = Dex.getId;
 const fs = require('fs');
 const importTeam = require('../util').importTeam;
-const MySqlService = require('./mysql-service').MySqlService;
+const SqlService = require('./sql-service').SqlService;
 // const validatePokemonSets = require('./team-validate-service').validatePokemonSets;
 
-const mySqlService = new MySqlService();
+const sqlService = new SqlService();
 
 const matchupCandidates = loadPokemonSetsFromTexts(global.program.directory);
 // const customGameFormat = Dex.getFormat(`gen8customgame`, true);
@@ -18,13 +18,22 @@ const matchupCandidates = loadPokemonSetsFromTexts(global.program.directory);
 // customGameFormat.forcedLevel = 50;
 // validatePokemonSets(customGameFormat, matchupCandidates)
 
+const insertPromises = [];
 matchupCandidates.forEach(poke => {
   console.log(`Insert ${poke.species} to DB...`);
 
-  mySqlService.insertPokemonStrategy(poke);
+  insertPromises.push(sqlService.insertPokemonStrategy(poke));
 })
 
-mySqlService.endConnection();
+Promise.all(insertPromises).then(
+  value => {
+    sqlService.endConnection();
+  },
+  error => {
+    console.log(error);
+    sqlService.endConnection();
+  }
+);
 
 // Read target pokemon sets from team text. If an error occurs, just skip the file and continue.
 function loadPokemonSetsFromTexts(directoryPath) {
