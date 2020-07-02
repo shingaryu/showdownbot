@@ -6,10 +6,6 @@ class SqlService extends PostgresRepositoryBase {
     super();
   }
 
-  endConnection() {
-    this.client.end();
-  }
-
   insertPokemonStrategy(poke) {
     const sql = `
       INSERT INTO pokemon_strategies (

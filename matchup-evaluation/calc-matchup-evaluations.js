@@ -2,7 +2,7 @@
 global.program = require('commander');
 global.program
 .option('--net [action]', "'create' - generate a new network. 'update' - use and modify existing network. 'use' - use, but don't modify network. 'none' - use hardcoded weights. ['none']", 'none')
-.option('-d --depth [depth]', "Minimax bot searches to this depth in the matchup evaluation. [2]", "5")
+.option('-d --depth [depth]', "Minimax bot searches to this depth in the matchup evaluation. [2]", "2")
 .option('--nolog', "Don't append to log files.")
 .option('--onlyinfo [onlyinfo]', "Hide debug messages and speed up bot calculations", true)
 .option('--usechildprocess', "Use child process to execute heavy calculations with parent process keeping the connection to showdown server.")
@@ -32,10 +32,21 @@ const weights = {
 calcMatupFromIdSets(weights, global.program.numoftrials, global.program.depth, 1);
 
 async function calcMatupFromIdSets (weights, oneOnOneRepetition, minimaxDepth, minimaxRepetiton = 1) {
-  const sqlService = new SqlService();
+  const startTime = new Date();
+  const sqlForIdSets = new SqlService();
   const calculatedAt = moment().format('YYYY-MM-DD HH:mm:ss');  
-  const targetStrategyIdSets = await sqlService.fetchTargetStrategyIdSets();
+  const targetStrategyIdSets = await sqlForIdSets.fetchTargetStrategyIdSets();
+  sqlForIdSets.endConnection();
 
+  if (targetStrategyIdSets.length === 0) {
+    logger.info('There is no matchup to be calculated. App is being closed...')
+    return;
+  } else {
+    logger.info(`${targetStrategyIdSets.length} matchup(s) to be calculated`)
+  }
+
+    let succeeded = 0;
+    let failed = 0;
     for (let i = 0; i < targetStrategyIdSets.length; i++) {
       const idSet = targetStrategyIdSets[i];
       const myPoke = createPokemonSet(
@@ -132,11 +143,26 @@ async function calcMatupFromIdSets (weights, oneOnOneRepetition, minimaxDepth, m
        const stdD = stdDev(repeatedOneOnOneValues);
        const cv = stdD / Math.abs(ave);
  
-       logger.info(`Matchup strength: ${ave} (stddev: ${stdD}, C.V.: ${cv})`);  
-       const results = await sqlService.insertMatchupEvaluation(idSet.str1_id, idSet.str2_id, ave, calculatedAt);
-       logger.info('Inserted to DB');
-       console.log(results)
+      logger.info(`Matchup strength: ${ave} (stddev: ${stdD}, C.V.: ${cv})`);
+      try {
+        const sqlForInsert = new SqlService();
+        await sqlForInsert.insertMatchupEvaluation(idSet.str1_id, idSet.str2_id, ave, calculatedAt);
+        sqlForInsert.endConnection();
+        succeeded++;
+        logger.info('Successfully inserted to DB');
+      } catch (error) {
+        logger.info('Failed to insert the matchup value to DB. This matchup will be skipped.');
+        sqlForInsert.endConnection();
+        failed++;
+        console.log(error);
+      }
    }
+
+   const endTime = new Date();
+   const duration = moment.duration(endTime - startTime);
+   logger.info('Finished all calculations!');
+   logger.info(`Succeeded: ${succeeded}, Failed: ${failed}`);
+   logger.info(`Elapsed time: ${duration.hours()}h ${duration.minutes()}m ${duration.seconds()}s`);
 }
 
 function createPokemonSet(

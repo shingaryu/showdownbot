@@ -5,7 +5,6 @@ class PostgresRepositoryBase {
   constructor() {
     const postgresCredentials = JSON.parse(fs.readFileSync('./matchup-evaluation/postgres-credentials.json'));
 
-    console.log(postgresCredentials.databaseUrl)
     // on heroku environment
     if (process.env.NODE_ENV === 'production') {
       this.client = new Client({
@@ -23,6 +22,10 @@ class PostgresRepositoryBase {
     }
 
     this.client.connect();
+  }
+
+  endConnection() {
+    this.client.end();
   }
 
   sqlQueryPromise(statement) {
