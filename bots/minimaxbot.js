@@ -291,7 +291,9 @@ class Minimax {
 
     decide(battle, choices, maxDepth = 2) {
         var startTime = new Date();
-        battle.start();
+        if (!battle.started) {
+            battle.start();
+        }
     
         var maxNode = this.playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices);
         if(!maxNode.action) return randombot.decide(battle, choices);

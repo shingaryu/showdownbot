@@ -43,7 +43,7 @@ const BattleStatIDs = {
 };
 
 module.exports.importTeam = function(text, teams) {
-	const TypeChart = require("./showdown-sources/data/typechart");
+	const TypeChart = require("./showdown-sources/.data-dist/typechart");
 	var text = text.split("\n");
 	var team = [];
 	var curSet = null;

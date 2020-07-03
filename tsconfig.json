@@ -14,11 +14,6 @@
         "./showdown-sources/.*-dist/**/*"
     ],
     "include": [
-        "./showdown-sources/config/formats.js",
-        "./showdown-sources/data/*",
-        "./showdown-sources/data/mods/*/*",
-        "./showdown-sources/lib/*",
-        "./showdown-sources/sim/**/*",
-        "./tools/set-import/*.ts"
+        "./showdown-sources/**/*"
     ]
 }

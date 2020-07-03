@@ -102,8 +102,11 @@ class PcmBattle extends Battle {
 		}
 	}
 
-  // for disabling critical hit
-	getDamage(pokemon, target, move, suppressMessages = false) {
+	// for disabling critical hit
+	getDamage(
+		pokemon, target, move,
+		suppressMessages = false
+	) {
 		if (typeof move === 'string') move = this.dex.getActiveMove(move);
 
 		if (typeof move === 'number') {
@@ -139,15 +142,15 @@ class PcmBattle extends Battle {
 			basePower = move.basePowerCallback.call(this, pokemon, target, move);
 		}
 		if (!basePower) return basePower === 0 ? undefined : basePower;
-		basePower = this.dex.clampIntRange(basePower, 1);
+		basePower = this.clampIntRange(basePower, 1);
 
 		let critMult;
 		let critRatio = this.runEvent('ModifyCritRatio', pokemon, target, move, move.critRatio || 0);
 		if (this.gen <= 5) {
-			critRatio = this.dex.clampIntRange(critRatio, 0, 5);
+			critRatio = this.clampIntRange(critRatio, 0, 5);
 			critMult = [0, 16, 8, 4, 3, 2];
 		} else {
-			critRatio = this.dex.clampIntRange(critRatio, 0, 4);
+			critRatio = this.clampIntRange(critRatio, 0, 4);
 			if (this.gen === 6) {
 				critMult = [0, 16, 8, 2, 1];
 			} else {
@@ -156,8 +159,14 @@ class PcmBattle extends Battle {
 		}
 
 		const moveHit = target.getMoveHitData(move);
-		moveHit.crit = false; //always make crit false
+		/***********************************
+		* Modified from original 
+		************************************/
 		// moveHit.crit = move.willCrit || false;
+		moveHit.crit = false; //always make crit false
+		/***********************************
+		* Up to here
+		************************************/
 		if (move.willCrit === undefined) {
 			if (critRatio) {
 				moveHit.crit = this.randomChance(1, critMult[critRatio]);
@@ -172,20 +181,37 @@ class PcmBattle extends Battle {
 		basePower = this.runEvent('BasePower', pokemon, target, move, basePower, true);
 
 		if (!basePower) return 0;
-		basePower = this.dex.clampIntRange(basePower, 1);
+		basePower = this.clampIntRange(basePower, 1);
 
 		const level = pokemon.level;
 
 		const attacker = pokemon;
 		const defender = target;
-		const attackStat = category === 'Physical' ? 'atk' : 'spa';
+		let attackStat = category === 'Physical' ? 'atk' : 'spa';
 		const defenseStat = defensiveCategory === 'Physical' ? 'def' : 'spd';
+		if (move.useSourceDefensiveAsOffensive) {
+			attackStat = defenseStat;
+			// Body press really wants to use the def stat,
+			// so it switches stats to compensate for Wonder Room.
+			// Of course, the game thus miscalculates the boosts...
+			if ('wonderroom' in this.field.pseudoWeather) {
+				if (attackStat === 'def') {
+					attackStat = 'spd';
+				} else if (attackStat === 'spd') {
+					attackStat = 'def';
+				}
+				if (attacker.boosts['def'] || attacker.boosts['spd']) {
+					this.hint("Body Press uses Sp. Def boosts when Wonder Room is active.");
+				}
+			}
+		}
+
 		const statTable = {atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe'};
 		let attack;
 		let defense;
 
 		let atkBoosts = move.useTargetOffensive ? defender.boosts[attackStat] : attacker.boosts[attackStat];
-		let defBoosts = move.useSourceDefensive ? attacker.boosts[defenseStat] : defender.boosts[defenseStat];
+		let defBoosts = defender.boosts[defenseStat];
 
 		let ignoreNegativeOffensive = !!move.ignoreNegativeOffensive;
 		let ignorePositiveDefensive = !!move.ignorePositiveDefensive;
@@ -212,15 +238,16 @@ class PcmBattle extends Battle {
 			attack = attacker.calculateStat(attackStat, atkBoosts);
 		}
 
-		if (move.useSourceDefensive) {
-			defense = attacker.calculateStat(defenseStat, defBoosts);
-		} else {
-			defense = defender.calculateStat(defenseStat, defBoosts);
-		}
+		attackStat = (category === 'Physical' ? 'atk' : 'spa');
+		defense = defender.calculateStat(defenseStat, defBoosts);
 
 		// Apply Stat Modifiers
 		attack = this.runEvent('Modify' + statTable[attackStat], attacker, defender, move, attack);
 		defense = this.runEvent('Modify' + statTable[defenseStat], defender, attacker, move, defense);
+
+		if (this.gen <= 4 && ['explosion', 'selfdestruct'].includes(move.id) && defenseStat === 'def') {
+			defense = this.clampIntRange(Math.floor(defense / 2), 1);
+		}
 
 		const tr = this.trunc;
 
@@ -235,7 +262,7 @@ class PcmBattle extends Battle {
 	setPlayer(slot, options) {
 		let side;
 		let didSomething = true;
-		const slotNum = parseInt(slot[1], 10) - 1;
+		const slotNum = parseInt(slot[1]) - 1;
 		if (!this.sides[slotNum]) {
 			// create player
 			const team = this.getTeam(options);
@@ -262,7 +289,9 @@ class PcmBattle extends Battle {
 		if (!didSomething) return;
 		this.inputLog.push(`>player ${slot} ` + JSON.stringify(options));
 		this.add('player', side.id, side.name, side.avatar, options.rating || '');
-		// this.start();
+		
+		// Start the battle if it's ready to start
+		// if (this.sides.every(playerSide => !!playerSide) && !this.started) this.start();
 	}
  
   go() {
