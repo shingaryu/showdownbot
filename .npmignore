@@ -1,0 +1,16 @@
+.vscode/
+showdown-sources/lib/
+showdown-sources/sim/
+showdown-sources/server/
+showdown-sources/tools/
+showdown-sources/build
+matchup-evaluation/
+templates/
+bot.js
+console.js
+desktop.ini
+epicwin.png
+minimax_job.sh
+roomhandler.js
+strength-table.js
+tsconfig.json
