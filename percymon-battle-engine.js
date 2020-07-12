@@ -70,10 +70,10 @@ global.string = function (str) {
 
 class PcmPokemon extends Pokemon {
 	constructor(set, side) {
-    const baseTemplate = Dex.getTemplate(set.species || set.name);
+    const baseTemplate = Dex.getSpecies(set.species || set.name);
 		if (!baseTemplate.exists) {
       side.battle.debug('Unidentified species: ' + Dex.getSpecies(set.species));
-      const bulbasaurSet = Dex.getTemplate('Bulbasaur');
+      const bulbasaurSet = Dex.getSpecies('Bulbasaur');
       super(bulbasaurSet, side);
     } else {
       super(set, side);

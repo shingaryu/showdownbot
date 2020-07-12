@@ -84,12 +84,12 @@ var BattleRoom = new JS.Class({
         let team1 = [];
         const team2 = [];
         for (let i = 0; i < 6; i++) {
-            const bulbasaur1 = this.dexForFormat.getTemplate('Bulbasaur');
-            bulbasaur1.moves = [];
+            const bulbasaur1 = this.dexForFormat.getSpecies('Bulbasaur');
+            bulbasaur1.moves = ['Tackle'];
             bulbasaur1.level = 1;
             team1.push(bulbasaur1);
-            const bulbasaur2 = this.dexForFormat.getTemplate('Bulbasaur');
-            bulbasaur2.moves = [];
+            const bulbasaur2 = this.dexForFormat.getSpecies('Bulbasaur');
+            bulbasaur2.moves = ['Tackle'];
             bulbasaur2.level = 1;
             team2.push(bulbasaur2);
         }
@@ -180,7 +180,7 @@ var BattleRoom = new JS.Class({
         if(!pokemon) { //pokemon has not been defined yet, so choose Bulbasaur
             //note: this will not quite work if the pokemon is actually Bulbasaur
             pokemon = this.getPokemon(battleside, "Bulbasaur");
-            var set = this.state.dex.getTemplate(speciesName);
+            var set = this.state.dex.getSpecies(speciesName);
             set.moves = set.randomBattleMoves;
             //set.moves = _.sample(set.randomBattleMoves, 4); //for efficiency, need to implement move ordering
             set.level = parseInt(level);
@@ -924,7 +924,7 @@ var BattleRoom = new JS.Class({
                     shiny: false
                 };
     
-                let template = this.state.dex.getTemplate(name);               
+                let template = this.state.dex.getSpecies(name);               
                 Object.assign(template, templateFromSideData);
                 
                 //keep track of old pokemon
