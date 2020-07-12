@@ -5,7 +5,6 @@ showdown-sources/sim/
 showdown-sources/server/
 showdown-sources/tools/
 showdown-sources/build
-matchup-evaluation/
 templates/
 battleroom.js
 bot.js
