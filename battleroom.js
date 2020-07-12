@@ -22,8 +22,7 @@ var Abilities = require("./showdown-sources/.data-dist/abilities").BattleAbiliti
 var Items = require("./showdown-sources/.data-dist/items").BattleItems;
 
 var _ = require("underscore");
-
-const cloneBattle = require('./util').cloneBattle;
+const Util = require('./util');
 
 const terrainMoves = new Map();
 terrainMoves.set('Electric Terrain', ['Electric Terrain', 'Z-Electric Terrain', 'Max Lightning']);
@@ -1000,94 +999,28 @@ var BattleRoom = new JS.Class({
            
             if(program.net === "update") {
                 if(room.previousState != null) minimaxbot.train_net(room.previousState, room.state);
-                room.previousState = cloneBattle(room.state);
+                room.previousState = Util.cloneBattle(room.state);
             }
 
-            var decision = BattleRoom.parseRequest(request);
+            var decision = Util.parseRequest(request);
            
             // Use specified algorithm to determine resulting choice
             var result = undefined;
             if(decision.choices.length == 1) result = decision.choices[0];
             else if(program.algorithm === "minimax") {
                 const minimax = new Minimax(true, 1); 
-                result = minimax.decide(cloneBattle(room.state), decision.choices, program.depth);
+                result = minimax.decide(Util.cloneBattle(room.state), decision.choices, program.depth);
             } 
-            else if(program.algorithm === "greedy") result = greedybot.decide(cloneBattle(room.state), decision.choices);
-            else if(program.algorithm === "random") result = randombot.decide(cloneBattle(room.state), decision.choices);
+            else if(program.algorithm === "greedy") result = greedybot.decide(Util.cloneBattle(room.state), decision.choices);
+            else if(program.algorithm === "random") result = randombot.decide(Util.cloneBattle(room.state), decision.choices);
 
             room.decisions.push(result);
-            room.send("/choose " + BattleRoom.toChoiceString(result, room.state.p1) + "|" + decision.rqid, room.id);
+            room.send("/choose " + Util.toChoiceString(result, room.state.p1) + "|" + decision.rqid, room.id);
         }, 5000);
-    },
-    // Static class methods
-    extend: {
-        toChoiceString: function(choice, battleside) {
-            if (choice.type == "move") {
-                if (choice.runMegaEvo)
-                    return "move " + choice.id + " mega";
-                else if (choice.useZMove)
-                    return "move " + choice.id + " zmove";
-                else if (choice.runDynamax)
-                    return "move " + choice.id + " dynamax";                    
-                else
-                    return "move " + choice.id;
-            } else if (choice.type == "switch") {
-                return "switch " + (choice.id + 1);
-            }
-        },
-        parseRequest: function(request) {
-            var choices = [];
-
-            if(!request) return choices; // Empty request
-            if(request.wait) return choices; // This player is not supposed to make a move
-
-            // If we can make a move
-            if (request.active) {
-                _.each(request.active[0].moves, function(move, index) {
-                    if (!move.disabled) {
-                        const choice = {
-                            "type": "move",
-                            "id": move.id,
-                        };
-                        choices.push(choice);
-
-                        if (request.active[0].canMegaEvo) {
-                            choices.push({...choice, "runMegaEvo": request.active[0].canMegaEvo})
-                        }
-                        if (request.active[0].canZMove && request.active[0].canZMove[index]) {
-                            choices.push({...choice, "useZMove": true})
-                        }
-                        if (request.active[0].canDynamax) {
-                            choices.push({...choice, "runDynamax": true})
-                        }
-                    }
-                });
-            }
-
-            // Switching options
-            var trapped = (request.active) ? (request.active[0].trapped || request.active[0].maybeTrapped) : false;
-            var canSwitch = request.forceSwitch || !trapped;
-            if (canSwitch) {
-                _.each(request.side.pokemon, function(pokemon, index) {
-                    if (pokemon.condition.indexOf("fnt") < 0 && !pokemon.active) {
-                        choices.push({
-                            "type": "switch",
-                            "id": index
-                        });
-                    }
-                });
-            }
-
-            return {
-                rqid: request.rqid,
-                choices: choices
-            };
-        }
     }
 });
 module.exports = BattleRoom;
 
-var minimaxbot = require("./bots/minimaxbot");
-const Minimax = minimaxbot.Minimax;
+const { Minimax } = require("./bots/minimaxbot");
 var greedybot = require("./bots/greedybot");
 var randombot = require("./bots/randombot");

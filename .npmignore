@@ -7,6 +7,7 @@ showdown-sources/tools/
 showdown-sources/build
 matchup-evaluation/
 templates/
+battleroom.js
 bot.js
 console.js
 desktop.ini

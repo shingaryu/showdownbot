@@ -1,5 +1,6 @@
 const clone = require('./clone');
 const PRNG = require('./showdown-sources/.sim-dist/prng').PRNG;
+const _ = require("underscore");
 
 // Some Pokemon Showdown-specific JSON parsing rules
 module.exports.safeJSON = function(data) {
@@ -49,4 +50,68 @@ module.exports.cloneBattle = function(battle, copyPRNG = true) {
 	}
 
 	return newbattle;
+}
+
+module.exports.toChoiceString = function(choice) {
+	if (choice.type == "move") {
+			if (choice.runMegaEvo)
+					return "move " + choice.id + " mega";
+			else if (choice.useZMove)
+					return "move " + choice.id + " zmove";
+			else if (choice.runDynamax)
+					return "move " + choice.id + " dynamax";                    
+			else
+					return "move " + choice.id;
+	} else if (choice.type == "switch") {
+			return "switch " + (choice.id + 1);
+	}
+}
+
+module.exports.parseRequest = function(request) {
+	var choices = [];
+
+	if(!request) return choices; // Empty request
+	if(request.wait) return choices; // This player is not supposed to make a move
+
+	// If we can make a move
+	if (request.active) {
+			_.each(request.active[0].moves, function(move, index) {
+					if (!move.disabled) {
+							const choice = {
+									"type": "move",
+									"id": move.id,
+							};
+							choices.push(choice);
+
+							if (request.active[0].canMegaEvo) {
+									choices.push({...choice, "runMegaEvo": request.active[0].canMegaEvo})
+							}
+							if (request.active[0].canZMove && request.active[0].canZMove[index]) {
+									choices.push({...choice, "useZMove": true})
+							}
+							if (request.active[0].canDynamax) {
+									choices.push({...choice, "runDynamax": true})
+							}
+					}
+			});
+	}
+
+	// Switching options
+	var trapped = (request.active) ? (request.active[0].trapped || request.active[0].maybeTrapped) : false;
+	var canSwitch = request.forceSwitch || !trapped;
+	if (canSwitch) {
+			_.each(request.side.pokemon, function(pokemon, index) {
+					if (pokemon.condition.indexOf("fnt") < 0 && !pokemon.active) {
+							choices.push({
+									"type": "switch",
+									"id": index
+							});
+					}
+			});
+	}
+
+	return {
+			rqid: request.rqid,
+			choices: choices
+	};
 }

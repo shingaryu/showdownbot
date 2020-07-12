@@ -3,12 +3,8 @@ var log4js = require('log4js');
 var logger = log4js.getLogger("greedy");
 
 var _ = require("underscore");
-var BattleRoom = require("./../battleroom");
-
-var randombot = require("./randombot");
 
 var Dex = require("../showdown-sources/.sim-dist/dex").Dex;
-const Battle = require("../showdown-sources/.sim-dist/dex").Dex;
 var damagingMoves = ["return", "grassknot", "lowkick", "gyroball", "heavyslam"];
 
 var switchPriority = module.exports.switchPriority = function(battle, pokemon, p1, p2) {

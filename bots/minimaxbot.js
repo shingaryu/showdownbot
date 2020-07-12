@@ -6,7 +6,7 @@ var learnlog = require('log4js').getLogger("learning");
 var fs = require('fs');
 
 var _ = require("underscore");
-var BattleRoom = require("./../battleroom");
+const Util = require("../util");
 
 var randombot = require("./randombot");
 var greedybot = require("./greedybot");
@@ -114,7 +114,7 @@ var train_net = module.exports.train_net = function(battle, newbattle, win) {
         value *= DISCOUNT;
     }
     else {
-        const p1Choices = BattleRoom.parseRequest(battle.p1.request).choices;
+        const p1Choices = Util.parseRequest(battle.p1.request).choices;
         value = DISCOUNT * eval(newbattle, p1Choices, defaultWeights);
 
         var isAlive = function(pokemon) { return pokemon.hp > 0; };
@@ -325,7 +325,7 @@ class Minimax {
             state : battle.toString()
         };
     
-        var choices = (givenchoices) ? givenchoices : BattleRoom.parseRequest(battle.p1.request).choices;
+        var choices = (givenchoices) ? givenchoices : Util.parseRequest(battle.p1.request).choices;
         choices = this.arrangeP1Choices(choices, battle);
         for(var i = 0; i < choices.length; i++) {
             logger.trace(choices[i].id + " with priority " + choices[i].priority);
@@ -402,11 +402,11 @@ class Minimax {
         if(battle.p2.request.wait) {
             var newbattle = cloneBattle(battle);
             newbattle.p2.decision = true;
-            newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
+            newbattle.choose('p1', Util.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
             return this.playerTurn(newbattle, depth - 1, alpha, beta, null);
         }
     
-        var choices = BattleRoom.parseRequest(battle.p2.request).choices;
+        var choices = Util.parseRequest(battle.p2.request).choices;
         choices = this.arrangeP2Choices(choices, battle);
         for(var i = 0; i < choices.length; i++) {
             logger.trace(choices[i].id + " with priority " + choices[i].priority);
@@ -426,15 +426,15 @@ class Minimax {
         
                 // Register action, let battle simulate
                 if(playerAction) {
-                    newbattle.choose('p1', BattleRoom.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
+                    newbattle.choose('p1', Util.toChoiceString(playerAction, newbattle.p1), newbattle.rqid);
                 }
                 else {   
                     newbattle.p1.decision = true;
                 }
         
-                newbattle.choose('p2', BattleRoom.toChoiceString(choices[j], newbattle.p2), newbattle.rqid);
-                logger.trace("Player action: " + BattleRoom.toChoiceString(playerAction || '(wait)', newbattle.p1));
-                logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[j], newbattle.p2));
+                newbattle.choose('p2', Util.toChoiceString(choices[j], newbattle.p2), newbattle.rqid);
+                logger.trace("Player action: " + Util.toChoiceString(playerAction || '(wait)', newbattle.p1));
+                logger.trace("Opponent action: " + Util.toChoiceString(choices[j], newbattle.p2));
                 logger.trace("My Resulting Health:");
                 for(let k = 0; k < newbattle.p1.pokemon.length; k++) {
                     logger.trace(newbattle.p1.pokemon[k].species.name + ": " + newbattle.p1.pokemon[k].hp + "/" + newbattle.p1.pokemon[k].maxhp);

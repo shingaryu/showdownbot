@@ -11,10 +11,10 @@ global.program
 
 const Dex = require('../showdown-sources/.sim-dist/dex').Dex;
 const PcmBattle = require('../percymon-battle-engine').PcmBattle;
-const BattleRoom = require("../battleroom");
 const Minimax = require("../bots/minimaxbot").Minimax;
 const cloneBattle = require('../util').cloneBattle;
 const initLog4js = require('../initLog4js');
+const Util = require('../util');
 const moment = require('moment');
 
 const SqlService = require('./sql-service').SqlService;
@@ -123,7 +123,7 @@ async function calcMatupFromIdSets (weights, oneOnOneRepetition, minimaxDepth, m
            const battle = new PcmBattle(battleOptions);
            battle.start();              
            battle.makeRequest();                   
-           const decision = BattleRoom.parseRequest(battle.p1.request);
+           const decision = Util.parseRequest(battle.p1.request);
            const minimaxDecision = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth);
           //  try {
           //    fs.writeFileSync(`./${decisionLogDir}/Decision Logs/${myPoke.species}-${oppPoke.species}_${k}_${l}.json`, JSON.stringify(minimaxDecision));

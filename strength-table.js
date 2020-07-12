@@ -13,11 +13,11 @@ const fs = require('fs');
 const Dex = require('./showdown-sources/.sim-dist/dex').Dex;
 const TeamValidator = require('./showdown-sources/.sim-dist/team-validator').TeamValidator;
 const PcmBattle = require('./percymon-battle-engine').PcmBattle;
-const BattleRoom = require("./battleroom");
 const Minimax = require("./bots/minimaxbot").Minimax;
 const cloneBattle = require('./util').cloneBattle;
 const { TeamImporter } = require('./team-importer');
 const initLog4js = require('./initLog4js');
+const Util = require('./util');
 const moment = require('moment');
 
 // Setup Logging
@@ -72,7 +72,7 @@ function makeStrengthTable(weights, oneOnOneRepetition, minimaxDepth, minimaxRep
           const battle = new PcmBattle(battleOptions);
           battle.start();              
           battle.makeRequest();                   
-          const decision = BattleRoom.parseRequest(battle.p1.request);
+          const decision = Util.parseRequest(battle.p1.request);
           const minimaxDecision = minimax.decide(cloneBattle(battle), decision.choices, minimaxDepth);
           try {
             fs.writeFileSync(`./${rootDir}/Decision Logs/(${i})${myPoke.species}-(${j})${oppPoke.species}_${k}_${l}.json`, JSON.stringify(minimaxDecision));
