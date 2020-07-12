@@ -72,7 +72,7 @@ class PcmPokemon extends Pokemon {
 	constructor(set, side) {
     const baseTemplate = Dex.getSpecies(set.species || set.name);
 		if (!baseTemplate.exists) {
-      side.battle.debug('Unidentified species: ' + Dex.getSpecies(set.species));
+      side.battle.debug(`Unidentified species: ${this.baseSpecies.name}`);
       const bulbasaurSet = Dex.getSpecies('Bulbasaur');
       super(bulbasaurSet, side);
     } else {
@@ -316,7 +316,7 @@ class PcmBattle extends Battle {
 
 	    function formatPokemon(pokemon) {
 		var text = "";
-		text += pokemon.name + " " + pokemon.hp + "/" + pokemon.maxhp;
+		text += pokemon.species.name + " " + pokemon.hp + "/" + pokemon.maxhp;
                 if(pokemon.status) {
                     text += " " + pokemon.status;
                     //debug purposes

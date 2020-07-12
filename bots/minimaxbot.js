@@ -437,11 +437,11 @@ class Minimax {
                 logger.trace("Opponent action: " + BattleRoom.toChoiceString(choices[j], newbattle.p2));
                 logger.trace("My Resulting Health:");
                 for(let k = 0; k < newbattle.p1.pokemon.length; k++) {
-                    logger.trace(newbattle.p1.pokemon[k].id + ": " + newbattle.p1.pokemon[k].hp + "/" + newbattle.p1.pokemon[k].maxhp);
+                    logger.trace(newbattle.p1.pokemon[k].species.name + ": " + newbattle.p1.pokemon[k].hp + "/" + newbattle.p1.pokemon[k].maxhp);
                 }
                 logger.trace("Opponent's Resulting Health:");
                 for(let k = 0; k < newbattle.p2.pokemon.length; k++) {
-                    logger.trace(newbattle.p2.pokemon[k].id + ": " + newbattle.p2.pokemon[k].hp + "/" + newbattle.p2.pokemon[k].maxhp);
+                    logger.trace(newbattle.p2.pokemon[k].species.name + ": " + newbattle.p2.pokemon[k].hp + "/" + newbattle.p2.pokemon[k].maxhp);
                 }
                 var maxNode = this.playerTurn(newbattle, depth - 1, alpha, beta, null);
                 node.children.push(maxNode);

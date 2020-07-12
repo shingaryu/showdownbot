@@ -481,12 +481,12 @@ var BattleRoom = new JS.Class({
         })
 
         this.state.p1.pokemon.forEach(poke => {
-            if (poke.name === pokeName || poke.species === pokeName) {
+            if (poke.name === pokeName || poke.species.name === pokeName) {
                 source = poke;
             }
         });
         this.state.p2.pokemon.forEach(poke => {
-            if (poke.name === pokeName || poke.species === pokeName) {
+            if (poke.name === pokeName || poke.species.name === pokeName) {
                 source = poke;
             }
         });
@@ -964,7 +964,7 @@ var BattleRoom = new JS.Class({
         } 
 
         // Set canMegaEvo flag manually
-        const hasAlreadyMegaEvo = this.state.p1.pokemon.some(poke => poke.species.indexOf("-Mega") > 0);
+        const hasAlreadyMegaEvo = this.state.p1.pokemon.some(poke => poke.species.name.indexOf("-Mega") > 0);
         if (hasAlreadyMegaEvo) {
             this.state.p1.pokemon.forEach(poke => poke.canMegaEvo = false);
         }
