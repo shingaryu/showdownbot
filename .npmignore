@@ -1,4 +1,5 @@
 .vscode/
+showdown-sources/data/
 showdown-sources/lib/
 showdown-sources/sim/
 showdown-sources/server/
