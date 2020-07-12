@@ -6,7 +6,7 @@ global.program
 global.Dex = require('../showdown-sources/.sim-dist/dex').Dex;
 global.toId = Dex.getId;
 const fs = require('fs');
-const importTeam = require('../util').importTeam;
+const { TeamImporter } = require('./team-importer');
 const SqlService = require('./sql-service').SqlService;
 // const validatePokemonSets = require('./team-validate-service').validatePokemonSets;
 
@@ -43,7 +43,7 @@ function loadPokemonSetsFromTexts(directoryPath) {
   filenames.forEach(filename => {
     try {
       const rawText = fs.readFileSync(`${directoryPath}/${filename}`, "utf8");
-      const pokemonSets = importTeam(rawText); 
+      const pokemonSets = TeamImporter.importTeam(rawText); 
       if (!pokemonSets) {
         console.log(`'${filename}' doesn't contain a valid pokemon expression. We will just ignore this file.`);
       } else if (pokemonSets.length > 1) {

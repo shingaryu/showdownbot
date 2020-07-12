@@ -16,7 +16,7 @@ const PcmBattle = require('./percymon-battle-engine').PcmBattle;
 const BattleRoom = require("./battleroom");
 const Minimax = require("./bots/minimaxbot").Minimax;
 const cloneBattle = require('./util').cloneBattle;
-const importTeam = require('./util').importTeam;
+const { TeamImporter } = require('./team-importer');
 const initLog4js = require('./initLog4js');
 const moment = require('moment');
 
@@ -126,7 +126,7 @@ function loadPokemonSetsFromTexts(directoryPath) {
   filenames.forEach(filename => {
     try {
       const rawText = fs.readFileSync(`${directoryPath}/${filename}`, "utf8");
-      const pokemonSets = importTeam(rawText); 
+      const pokemonSets = TeamImporter.importTeam(rawText); 
       if (!pokemonSets) {
         logger.warn(`'${filename}' doesn't contain a valid pokemon expression. We will just ignore this file.`);
       } else if (pokemonSets.length > 1) {

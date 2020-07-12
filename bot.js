@@ -36,11 +36,11 @@ global.toId = Dex.getId;
 
 // Battle teams for this bot
 const teamText6g = fs.readFileSync(global.program.team6g, "utf8")
-global.team6g = require('./util').importTeam(teamText6g);
+global.team6g = require('./team-importer').TeamImporter.importTeam(teamText6g);
 const teamText7g = fs.readFileSync(global.program.team7g, "utf8")
-global.team7g = require('./util').importTeam(teamText7g);
+global.team7g = require('./team-importer').TeamImporter.importTeam(teamText7g);
 const teamText8g = fs.readFileSync(global.program.team8g, "utf8")
-global.team8g = require('./util').importTeam(teamText8g);
+global.team8g = require('./team-importer').TeamImporter.importTeam(teamText8g);
 
 // Connect to server
 var sockjs = require('sockjs-client-ws');
