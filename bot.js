@@ -32,7 +32,7 @@ global.account = JSON.parse(fs.readFileSync(global.program.account));
 
 // Global variables for simulator
 global.Dex = require('./showdown-sources/.sim-dist/dex').Dex;
-global.toId = Dex.getId;
+global.toId = Dex.toID;
 
 // Battle teams for this bot
 const teamText6g = fs.readFileSync(global.program.team6g, "utf8")

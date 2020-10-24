@@ -8,7 +8,7 @@
  **************************************************************************/
 
 const { Dex } = require('./showdown-sources/.sim-dist/dex');
-const { BattleTypeChart } = require("./showdown-sources/.data-dist/typechart");
+const { TypeChart } = require("./showdown-sources/.data-dist/typechart");
 
 /**************************************************************************
  * Adjustments of local/global objects in original codes
@@ -20,7 +20,7 @@ const $ = {
   }
 }
 
-const toID = Dex.getId;
+const toID = Dex.toID;
 
 // Refer to: pokemon-showdown-client/src/battle-dex-data.ts
 const BattleStatIDs = {
@@ -46,8 +46,8 @@ const BattleStatIDs = {
 if (typeof window === "undefined") {
   window = {};
 }
-window.BattleTypeChart = BattleTypeChart;
-exports.BattleTypeChart = BattleTypeChart;
+window.TypeChart = TypeChart;
+exports.TypeChart = TypeChart;
 
 function Storage() {}
 module.exports.TeamImporter = Storage;
@@ -631,10 +631,10 @@ Storage.importTeam = function (buffer, teams) {
 			if (line.substr(0, 14) === 'Hidden Power [') {
 				var hptype = line.substr(14, line.length - 15);
 				line = 'Hidden Power ' + hptype;
-				if (!curSet.ivs && window.BattleTypeChart && window.BattleTypeChart[hptype]) {
+				if (!curSet.ivs && window.TypeChart && window.TypeChart[hptype]) {
 					curSet.ivs = {};
-					for (var stat in window.BattleTypeChart[hptype].HPivs) {
-						curSet.ivs[stat] = window.BattleTypeChart[hptype].HPivs[stat];
+					for (var stat in window.TypeChart[hptype].HPivs) {
+						curSet.ivs[stat] = window.TypeChart[hptype].HPivs[stat];
 					}
 				}
 			}
@@ -736,12 +736,12 @@ Storage.exportTeam = function (team) {
 				var move = curSet.moves[j];
 				if (move.substr(0, 13) === 'Hidden Power ' && move.substr(0, 14) !== 'Hidden Power [') {
 					hpType = move.substr(13);
-					if (!exports.BattleTypeChart[hpType].HPivs) {
+					if (!exports.TypeChart[hpType].HPivs) {
 						alert("That is not a valid Hidden Power type.");
 						continue;
 					}
 					for (var stat in BattleStatNames) {
-						if ((curSet.ivs[stat] === undefined ? 31 : curSet.ivs[stat]) !== (exports.BattleTypeChart[hpType].HPivs[stat] || 31)) {
+						if ((curSet.ivs[stat] === undefined ? 31 : curSet.ivs[stat]) !== (exports.TypeChart[hpType].HPivs[stat] || 31)) {
 							defaultIvs = false;
 							break;
 						}

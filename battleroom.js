@@ -18,8 +18,8 @@ var decisionslogger = require('log4js').getLogger("decisions");
 var PcmBattle = require('./percymon-battle-engine').PcmBattle;
 var PcmPokemon = require('./percymon-battle-engine').PcmPokemon;
 
-var Abilities = require("./showdown-sources/.data-dist/abilities").BattleAbilities;
-var Items = require("./showdown-sources/.data-dist/items").BattleItems;
+var Abilities = require("./showdown-sources/.data-dist/abilities").Abilities;
+var Items = require("./showdown-sources/.data-dist/items").Items;
 
 var _ = require("underscore");
 const Util = require('./util');
@@ -836,7 +836,7 @@ var BattleRoom = new JS.Class({
                 }
             }    
         } catch (error) {
-            logger.error(error);
+            logger.error(error.stack);
             logger.error("Something happened in BattleRoom. We will leave the game.");
             this.send("/forfeit", this.id);
         }

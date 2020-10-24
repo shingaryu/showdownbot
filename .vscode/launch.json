@@ -18,10 +18,6 @@
             "request": "launch",
             "name": "Launch Program without child process",
             "program": "${workspaceFolder}\\bot.js",
-            "args": [
-            //"--startchallenging"    
-            "--ranked"
-            ],
             "console": "integratedTerminal",
             "autoAttachChildProcesses": true
         },
