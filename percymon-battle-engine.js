@@ -72,7 +72,7 @@ class PcmPokemon extends Pokemon {
 	constructor(set, side) {
     const baseTemplate = Dex.getSpecies(set.species || set.name);
 		if (!baseTemplate.exists) {
-      side.battle.debug(`Unidentified species: ${this.baseSpecies.name}`);
+      side.battle.debug(`Unidentified species: ${set.name}`);
       const bulbasaurSet = Dex.getSpecies('Bulbasaur');
       super(bulbasaurSet, side);
     } else {
