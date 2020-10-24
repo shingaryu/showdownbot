@@ -1,4 +1,4 @@
-export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
+export const FormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 	bulbasaur: {
 		tier: "LC",
 	},
@@ -411,7 +411,7 @@ export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		tier: "LC",
 	},
 	weezing: {
-		randomBattleMoves: ["explosion", "fireblast", "flamethrower", "haze", "painsplit", "sludgebomb", "willowisp"],
+		randomBattleMoves: ["explosion", "fireblast", "flamethrower", "haze", "painsplit", "sludgebomb", "toxic", "willowisp"],
 		tier: "UUBL",
 	},
 	rhyhorn: {
@@ -557,7 +557,7 @@ export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		tier: "LC",
 	},
 	kabutops: {
-		randomBattleMoves: ["brickbreak", "doubleedge", "hiddenpowerground", "rockslide", "surf", "swordsdance"],
+		randomBattleMoves: ["brickbreak", "doubleedge", "endure", "flail", "hiddenpowerground", "rockslide", "surf", "swordsdance"],
 		tier: "UU",
 	},
 	aerodactyl: {
@@ -653,7 +653,7 @@ export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		tier: "LC",
 	},
 	ariados: {
-		randomBattleMoves: ["agility", "batonpass", "signalbeam", "sludgebomb", "spiderweb"],
+		randomBattleMoves: ["agility", "batonpass", "signalbeam", "sludgebomb", "spiderweb", "toxic"],
 		tier: "NU",
 	},
 	chinchou: {
@@ -684,7 +684,7 @@ export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		tier: "NFE",
 	},
 	ampharos: {
-		randomBattleMoves: ["firepunch", "healbell", "hiddenpowergrass", "hiddenpowerice", "thunderbolt", "thunderwave"],
+		randomBattleMoves: ["firepunch", "healbell", "hiddenpowergrass", "hiddenpowerice", "thunderbolt", "toxic"],
 		tier: "UU",
 	},
 	azurill: {
@@ -783,11 +783,11 @@ export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		tier: "UU",
 	},
 	shuckle: {
-		randomBattleMoves: ["encore", "protect", "rest", "sleeptalk", "toxic", "wrap"],
+		randomBattleMoves: ["encore", "protect", "rest", "toxic", "wrap"],
 		tier: "NU",
 	},
 	heracross: {
-		randomBattleMoves: ["brickbreak", "facade", "megahorn", "rest", "reversal", "rockslide", "sleeptalk", "substitute", "swordsdance"],
+		randomBattleMoves: ["brickbreak", "focuspunch", "megahorn", "rest", "rockslide", "sleeptalk", "substitute", "swordsdance"],
 		tier: "OU",
 	},
 	sneasel: {
@@ -857,7 +857,7 @@ export const BattleFormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		tier: "UU",
 	},
 	smeargle: {
-		randomBattleMoves: ["batonpass", "encore", "explosion", "spiderweb", "spikes", "spore", "substitute"],
+		randomBattleMoves: ["encore", "explosion", "spikes", "spore"],
 		tier: "UUBL",
 	},
 	miltank: {

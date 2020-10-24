@@ -1,4 +1,4 @@
-export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
+export const Pokedex: {[speciesid: string]: SpeciesData} = {
 	bulbasaur: {
 		num: 1,
 		name: "Bulbasaur",
@@ -40,8 +40,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Ivysaur",
 		evoLevel: 32,
 		eggGroups: ["Monster", "Grass"],
-		otherFormes: ["Venusaur-Mega", "Venusaur-Gmax"],
-		formeOrder: ["Venusaur", "Venusaur-Mega", "Venusaur-Gmax"],
+		otherFormes: ["Venusaur-Mega"],
+		formeOrder: ["Venusaur", "Venusaur-Mega"],
+		canGigantamax: "G-Max Vine Lash",
 	},
 	venusaurmega: {
 		num: 3,
@@ -71,7 +72,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Monster", "Grass"],
-		isGigantamax: "G-Max Vine Lash",
+		changesFrom: "Venusaur",
 	},
 	charmander: {
 		num: 4,
@@ -114,8 +115,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Charmeleon",
 		evoLevel: 36,
 		eggGroups: ["Monster", "Dragon"],
-		otherFormes: ["Charizard-Mega-X", "Charizard-Mega-Y", "Charizard-Gmax"],
-		formeOrder: ["Charizard", "Charizard-Mega-X", "Charizard-Mega-Y", "Charizard-Gmax"],
+		otherFormes: ["Charizard-Mega-X", "Charizard-Mega-Y"],
+		formeOrder: ["Charizard", "Charizard-Mega-X", "Charizard-Mega-Y"],
+		canGigantamax: "G-Max Wildfire",
 	},
 	charizardmegax: {
 		num: 6,
@@ -160,7 +162,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Red",
 		eggGroups: ["Monster", "Dragon"],
-		isGigantamax: "G-Max Wildfire",
+		changesFrom: "Charizard",
 	},
 	squirtle: {
 		num: 7,
@@ -203,8 +205,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Wartortle",
 		evoLevel: 36,
 		eggGroups: ["Monster", "Water 1"],
-		otherFormes: ["Blastoise-Mega", "Blastoise-Gmax"],
-		formeOrder: ["Blastoise", "Blastoise-Mega", "Blastoise-Gmax"],
+		otherFormes: ["Blastoise-Mega"],
+		formeOrder: ["Blastoise", "Blastoise-Mega"],
+		canGigantamax: "G-Max Cannonade",
 	},
 	blastoisemega: {
 		num: 9,
@@ -234,7 +237,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Blue",
 		eggGroups: ["Monster", "Water 1"],
-		isGigantamax: "G-Max Cannonade",
+		changesFrom: "Blastoise",
 	},
 	caterpie: {
 		num: 10,
@@ -274,8 +277,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Metapod",
 		evoLevel: 10,
 		eggGroups: ["Bug"],
-		otherFormes: ["Butterfree-Gmax"],
-		formeOrder: ["Butterfree", "Butterfree-Gmax"],
+		canGigantamax: "G-Max Befuddle",
 	},
 	butterfreegmax: {
 		num: 12,
@@ -289,7 +291,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "White",
 		eggGroups: ["Bug"],
-		isGigantamax: "G-Max Befuddle",
+		changesFrom: "Butterfree",
 	},
 	weedle: {
 		num: 13,
@@ -535,15 +537,15 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "levelFriendship",
 		evos: ["Raichu", "Raichu-Alola"],
 		eggGroups: ["Field", "Fairy"],
-		otherFormes: ["Pikachu-Cosplay", "Pikachu-Rock-Star", "Pikachu-Belle", "Pikachu-Pop-Star", "Pikachu-PhD", "Pikachu-Libre", "Pikachu-Original", "Pikachu-Hoenn", "Pikachu-Sinnoh", "Pikachu-Unova", "Pikachu-Kalos", "Pikachu-Alola", "Pikachu-Partner", "Pikachu-Starter", "Pikachu-Gmax", "Pikachu-World"],
+		otherFormes: ["Pikachu-Cosplay", "Pikachu-Rock-Star", "Pikachu-Belle", "Pikachu-Pop-Star", "Pikachu-PhD", "Pikachu-Libre", "Pikachu-Original", "Pikachu-Hoenn", "Pikachu-Sinnoh", "Pikachu-Unova", "Pikachu-Kalos", "Pikachu-Alola", "Pikachu-Partner", "Pikachu-Starter", "Pikachu-World"],
 		formeOrder: [
 			"Pikachu",
 			"Pikachu-Original", "Pikachu-Hoenn", "Pikachu-Sinnoh", "Pikachu-Unova", "Pikachu-Kalos", "Pikachu-Alola", "Pikachu-Partner", // Gen 7 formes
 			"Pikachu-Starter", // forme 8 in LGPE
 			"Pikachu-World", // Gen 8 forme (indexed as Pikachu 9 in datamine)
 			"Pikachu-Rock-Star", "Pikachu-Belle", "Pikachu-Pop-Star", "Pikachu-PhD", "Pikachu-Libre", "Pikachu-Cosplay", // formes 1-6 from Gen 6
-			"Pikachu-Gmax", // not a true forme
 		],
+		canGigantamax: "G-Max Volt Crash",
 	},
 	pikachucosplay: {
 		num: 25,
@@ -770,7 +772,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Yellow",
 		eggGroups: ["Field", "Fairy"],
-		isGigantamax: "G-Max Volt Crash",
+		changesFrom: "Pikachu",
 	},
 	pikachuworld: {
 		num: 25,
@@ -1273,8 +1275,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		color: "Yellow",
 		evos: ["Persian"],
 		eggGroups: ["Field"],
-		otherFormes: ["Meowth-Alola", "Meowth-Galar", "Meowth-Gmax"],
-		formeOrder: ["Meowth", "Meowth-Alola", "Meowth-Galar", "Meowth-Gmax"],
+		otherFormes: ["Meowth-Alola", "Meowth-Galar"],
+		formeOrder: ["Meowth", "Meowth-Alola", "Meowth-Galar"],
+		canGigantamax: "G-Max Gold Rush",
 	},
 	meowthalola: {
 		num: 52,
@@ -1316,7 +1319,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Yellow",
 		eggGroups: ["Field"],
-		isGigantamax: "G-Max Gold Rush",
+		changesFrom: "Meowth",
 	},
 	persian: {
 		num: 53,
@@ -1566,8 +1569,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Machoke",
 		evoType: "trade",
 		eggGroups: ["Human-Like"],
-		otherFormes: ["Machamp-Gmax"],
-		formeOrder: ["Machamp", "Machamp-Gmax"],
+		canGigantamax: "G-Max Chi Strike",
 	},
 	machampgmax: {
 		num: 68,
@@ -1582,7 +1584,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Gray",
 		eggGroups: ["Human-Like"],
-		isGigantamax: "G-Max Chi Strike",
+		changesFrom: "Machamp",
 	},
 	bellsprout: {
 		num: 69,
@@ -2097,8 +2099,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Haunter",
 		evoType: "trade",
 		eggGroups: ["Amorphous"],
-		otherFormes: ["Gengar-Mega", "Gengar-Gmax"],
-		formeOrder: ["Gengar", "Gengar-Mega", "Gengar-Gmax"],
+		otherFormes: ["Gengar-Mega"],
+		formeOrder: ["Gengar", "Gengar-Mega"],
+		canGigantamax: "G-Max Terror",
 	},
 	gengarmega: {
 		num: 94,
@@ -2126,7 +2129,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Purple",
 		eggGroups: ["Amorphous"],
-		isGigantamax: "G-Max Terror",
+		changesFrom: "Gengar",
 	},
 	onix: {
 		num: 95,
@@ -2189,8 +2192,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Krabby",
 		evoLevel: 28,
 		eggGroups: ["Water 3"],
-		otherFormes: ["Kingler-Gmax"],
-		formeOrder: ["Kingler", "Kingler-Gmax"],
+		canGigantamax: "G-Max Foam Burst",
 	},
 	kinglergmax: {
 		num: 99,
@@ -2204,7 +2206,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Red",
 		eggGroups: ["Water 3"],
-		isGigantamax: "G-Max Foam Burst",
+		changesFrom: "Kingler",
 	},
 	voltorb: {
 		num: 100,
@@ -2761,8 +2763,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 220,
 		color: "Blue",
 		eggGroups: ["Monster", "Water 1"],
-		otherFormes: ["Lapras-Gmax"],
-		formeOrder: ["Lapras", "Lapras-Gmax"],
+		canGigantamax: "G-Max Resonance",
 	},
 	laprasgmax: {
 		num: 131,
@@ -2776,7 +2777,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Blue",
 		eggGroups: ["Monster", "Water 1"],
-		isGigantamax: "G-Max Resonance",
+		changesFrom: "Lapras",
 	},
 	ditto: {
 		num: 132,
@@ -2802,8 +2803,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		color: "Brown",
 		evos: ["Vaporeon", "Jolteon", "Flareon", "Espeon", "Umbreon", "Leafeon", "Glaceon", "Sylveon"],
 		eggGroups: ["Field"],
-		otherFormes: ["Eevee-Starter", "Eevee-Gmax"],
-		formeOrder: ["Eevee", "Eevee-Starter", "Eevee-Gmax"],
+		otherFormes: ["Eevee-Starter"],
+		formeOrder: ["Eevee", "Eevee-Starter"],
+		canGigantamax: "G-Max Cuddle",
 	},
 	eeveestarter: {
 		num: 133,
@@ -2832,7 +2834,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Brown",
 		eggGroups: ["Field"],
-		isGigantamax: "G-Max Cuddle",
+		changesFrom: "Eevee",
 	},
 	vaporeon: {
 		num: 134,
@@ -2989,8 +2991,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "levelFriendship",
 		eggGroups: ["Monster"],
 		canHatch: true,
-		otherFormes: ["Snorlax-Gmax"],
-		formeOrder: ["Snorlax", "Snorlax-Gmax"],
+		canGigantamax: "G-Max Replenish",
 	},
 	snorlaxgmax: {
 		num: 143,
@@ -3005,7 +3006,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Black",
 		eggGroups: ["Monster"],
-		isGigantamax: "G-Max Replenish",
+		changesFrom: "Snorlax",
 	},
 	articuno: {
 		num: 144,
@@ -3848,6 +3849,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Wynaut",
 		evoLevel: 15,
 		eggGroups: ["Amorphous"],
+		canHatch: true,
 	},
 	girafarig: {
 		num: 203,
@@ -7954,7 +7956,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		color: "Yellow",
 		prevo: "Electabuzz",
 		evoType: "trade",
-		evoItem: "Electrizer",
+		evoItem: "Electirizer",
 		eggGroups: ["Human-Like"],
 	},
 	magmortar: {
@@ -8072,7 +8074,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		color: "Red",
 		prevo: "Porygon2",
 		evoType: "trade",
-		evoItem: "Dubious Disk",
+		evoItem: "Dubious Disc",
 		eggGroups: ["Mineral"],
 	},
 	gallade: {
@@ -9823,8 +9825,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Trubbish",
 		evoLevel: 36,
 		eggGroups: ["Mineral"],
-		otherFormes: ["Garbodor-Gmax"],
-		formeOrder: ["Garbodor", "Garbodor-Gmax"],
+		canGigantamax: "G-Max Malodor",
 	},
 	garbodorgmax: {
 		num: 569,
@@ -9838,7 +9839,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Mineral"],
-		isGigantamax: "G-Max Malodor",
+		changesFrom: "Garbodor",
 	},
 	zorua: {
 		num: 570,
@@ -14079,8 +14080,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 800,
 		color: "Gray",
 		eggGroups: ["Undiscovered"],
-		otherFormes: ["Melmetal-Gmax"],
-		formeOrder: ["Melmetal", "Melmetal-Gmax"],
+		canGigantamax: "G-Max Meltdown",
 	},
 	melmetalgmax: {
 		num: 809,
@@ -14095,7 +14095,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Gray",
 		eggGroups: ["Undiscovered"],
-		isGigantamax: "G-Max Meltdown",
+		changesFrom: "Melmetal",
 	},
 	grookey: {
 		num: 810,
@@ -14138,8 +14138,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Thwackey",
 		evoLevel: 35,
 		eggGroups: ["Field", "Grass"],
-		otherFormes: ["Rillaboom-Gmax"],
-		formeOrder: ["Rillaboom", "Rillaboom-Gmax"],
+		canGigantamax: "G-Max Drum Solo",
 	},
 	rillaboomgmax: {
 		num: 812,
@@ -14154,7 +14153,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Field", "Grass"],
-		isGigantamax: "G-Max Drum Solo",
+		changesFrom: "Rillaboom",
 	},
 	scorbunny: {
 		num: 813,
@@ -14197,8 +14196,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Raboot",
 		evoLevel: 35,
 		eggGroups: ["Field", "Human-Like"],
-		otherFormes: ["Cinderace-Gmax"],
-		formeOrder: ["Cinderace", "Cinderace-Gmax"],
+		canGigantamax: "G-Max Fireball",
 	},
 	cinderacegmax: {
 		num: 815,
@@ -14213,7 +14211,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "White",
 		eggGroups: ["Field", "Human-Like"],
-		isGigantamax: "G-Max Fireball",
+		changesFrom: "Cinderace",
 	},
 	sobble: {
 		num: 816,
@@ -14256,8 +14254,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Drizzile",
 		evoLevel: 35,
 		eggGroups: ["Water 1", "Field"],
-		otherFormes: ["Inteleon-Gmax"],
-		formeOrder: ["Inteleon", "Inteleon-Gmax"],
+		canGigantamax: "G-Max Hydrosnipe",
 	},
 	inteleongmax: {
 		num: 818,
@@ -14272,7 +14269,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Blue",
 		eggGroups: ["Water 1", "Field"],
-		isGigantamax: "G-Max Hydrosnipe",
+		changesFrom: "Inteleon",
 	},
 	skwovet: {
 		num: 819,
@@ -14337,8 +14334,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Corvisquire",
 		evoLevel: 38,
 		eggGroups: ["Flying"],
-		otherFormes: ["Corviknight-Gmax"],
-		formeOrder: ["Corviknight", "Corviknight-Gmax"],
+		canGigantamax: "G-Max Wind Rage",
 	},
 	corviknightgmax: {
 		num: 823,
@@ -14352,7 +14348,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Purple",
 		eggGroups: ["Flying"],
-		isGigantamax: "G-Max Wind Rage",
+		changesFrom: "Corviknight",
 	},
 	blipbug: {
 		num: 824,
@@ -14392,8 +14388,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Dottler",
 		evoLevel: 30,
 		eggGroups: ["Bug"],
-		otherFormes: ["Orbeetle-Gmax"],
-		formeOrder: ["Orbeetle", "Orbeetle-Gmax"],
+		canGigantamax: "G-Max Gravitas",
 	},
 	orbeetlegmax: {
 		num: 826,
@@ -14407,7 +14402,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Red",
 		eggGroups: ["Bug"],
-		isGigantamax: "G-Max Gravitas",
+		changesFrom: "Orbeetle",
 	},
 	nickit: {
 		num: 827,
@@ -14508,8 +14503,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Chewtle",
 		evoLevel: 22,
 		eggGroups: ["Monster", "Water 1"],
-		otherFormes: ["Drednaw-Gmax"],
-		formeOrder: ["Drednaw", "Drednaw-Gmax"],
+		canGigantamax: "G-Max Stonesurge",
 	},
 	drednawgmax: {
 		num: 834,
@@ -14523,7 +14517,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Monster", "Water 1"],
-		isGigantamax: "G-Max Stonesurge",
+		changesFrom: "Drednaw",
 	},
 	yamper: {
 		num: 835,
@@ -14588,8 +14582,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Carkol",
 		evoLevel: 34,
 		eggGroups: ["Mineral"],
-		otherFormes: ["Coalossal-Gmax"],
-		formeOrder: ["Coalossal", "Coalossal-Gmax"],
+		canGigantamax: "G-Max Volcalith",
 	},
 	coalossalgmax: {
 		num: 839,
@@ -14603,7 +14596,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Black",
 		eggGroups: ["Mineral"],
-		isGigantamax: "G-Max Volcalith",
+		changesFrom: "Coalossal",
 	},
 	applin: {
 		num: 840,
@@ -14630,8 +14623,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "useItem",
 		evoItem: "Tart Apple",
 		eggGroups: ["Grass", "Dragon"],
-		otherFormes: ["Flapple-Gmax"],
-		formeOrder: ["Flapple", "Flapple-Gmax"],
+		canGigantamax: "G-Max Tartness",
 	},
 	flapplegmax: {
 		num: 841,
@@ -14645,7 +14637,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Grass", "Dragon"],
-		isGigantamax: "G-Max Tartness",
+		changesFrom: "Flapple",
 	},
 	appletun: {
 		num: 842,
@@ -14660,8 +14652,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "useItem",
 		evoItem: "Sweet Apple",
 		eggGroups: ["Grass", "Dragon"],
-		otherFormes: ["Appletun-Gmax"],
-		formeOrder: ["Appletun", "Appletun-Gmax"],
+		canGigantamax: "G-Max Sweetness",
 	},
 	appletungmax: {
 		num: 842,
@@ -14675,7 +14666,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Grass", "Dragon"],
-		isGigantamax: "G-Max Sweetness",
+		changesFrom: "Appletun",
 	},
 	silicobra: {
 		num: 843,
@@ -14701,8 +14692,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Silicobra",
 		evoLevel: 36,
 		eggGroups: ["Field", "Dragon"],
-		otherFormes: ["Sandaconda-Gmax"],
-		formeOrder: ["Sandaconda", "Sandaconda-Gmax"],
+		canGigantamax: "G-Max Sandblast",
 	},
 	sandacondagmax: {
 		num: 844,
@@ -14716,7 +14706,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Field", "Dragon"],
-		isGigantamax: "G-Max Sandblast",
+		changesFrom: "Sandaconda",
 	},
 	cramorant: {
 		num: 845,
@@ -14797,6 +14787,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		color: "Purple",
 		evos: ["Toxtricity", "Toxtricity-Low-Key"],
 		eggGroups: ["Undiscovered"],
+		canHatch: true,
 	},
 	toxtricity: {
 		num: 849,
@@ -14811,8 +14802,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Toxel",
 		evoLevel: 30,
 		eggGroups: ["Human-Like"],
-		otherFormes: ["Toxtricity-Low-Key", "Toxtricity-Gmax", "Toxtricity-Low-Key-Gmax"],
-		formeOrder: ["Toxtricity", "Toxtricity-Low-Key", "Toxtricity-Gmax", "Toxtricity-Low-Key-Gmax"],
+		otherFormes: ["Toxtricity-Low-Key"],
+		formeOrder: ["Toxtricity", "Toxtricity-Low-Key"],
+		canGigantamax: "G-Max Stun Shock",
 	},
 	toxtricitylowkey: {
 		num: 849,
@@ -14828,6 +14820,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Toxel",
 		evoLevel: 30,
 		eggGroups: ["Human-Like"],
+		canGigantamax: "G-Max Stun Shock",
 	},
 	toxtricitygmax: {
 		num: 849,
@@ -14841,7 +14834,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Purple",
 		eggGroups: ["Human-Like"],
-		isGigantamax: "G-Max Stun Shock",
+		changesFrom: "Toxtricity",
 	},
 	toxtricitylowkeygmax: {
 		num: 849,
@@ -14855,8 +14848,8 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Purple",
 		eggGroups: ["Human-Like"],
-		isGigantamax: "G-Max Stun Shock",
 		battleOnly: "Toxtricity-Low-Key",
+		changesFrom: "Toxtricity-Low-Key",
 	},
 	sizzlipede: {
 		num: 850,
@@ -14882,8 +14875,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Sizzlipede",
 		evoLevel: 28,
 		eggGroups: ["Bug"],
-		otherFormes: ["Centiskorch-Gmax"],
-		formeOrder: ["Centiskorch", "Centiskorch-Gmax"],
+		canGigantamax: "G-Max Centiferno",
 	},
 	centiskorchgmax: {
 		num: 851,
@@ -14897,7 +14889,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Red",
 		eggGroups: ["Bug"],
-		isGigantamax: "G-Max Centiferno",
+		changesFrom: "Centiskorch",
 	},
 	clobbopus: {
 		num: 852,
@@ -15034,8 +15026,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Hattrem",
 		evoLevel: 42,
 		eggGroups: ["Fairy"],
-		otherFormes: ["Hatterene-Gmax"],
-		formeOrder: ["Hatterene", "Hatterene-Gmax"],
+		canGigantamax: "G-Max Smite",
 	},
 	hatterenegmax: {
 		num: 858,
@@ -15050,7 +15041,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Pink",
 		eggGroups: ["Fairy"],
-		isGigantamax: "G-Max Smite",
+		changesFrom: "Hatterene",
 	},
 	impidimp: {
 		num: 859,
@@ -15093,8 +15084,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Morgrem",
 		evoLevel: 42,
 		eggGroups: ["Fairy", "Human-Like"],
-		otherFormes: ["Grimmsnarl-Gmax"],
-		formeOrder: ["Grimmsnarl", "Grimmsnarl-Gmax"],
+		canGigantamax: "G-Max Snooze",
 	},
 	grimmsnarlgmax: {
 		num: 861,
@@ -15109,7 +15099,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Purple",
 		eggGroups: ["Fairy", "Human-Like"],
-		isGigantamax: "G-Max Snooze",
+		changesFrom: "Grimmsnarl",
 	},
 	obstagoon: {
 		num: 862,
@@ -15221,9 +15211,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "other",
 		evoCondition: "spin while holding a Sweet",
 		eggGroups: ["Fairy", "Amorphous"],
-		otherFormes: ["Alcremie-Gmax"],
 		cosmeticFormes: ["Alcremie-Ruby-Cream", "Alcremie-Matcha-Cream", "Alcremie-Mint-Cream", "Alcremie-Lemon-Cream", "Alcremie-Salted-Cream", "Alcremie-Ruby-Swirl", "Alcremie-Caramel-Swirl", "Alcremie-Rainbow-Swirl"],
-		formeOrder: ["Alcremie", "Alcremie-Ruby-Cream", "Alcremie-Matcha-Cream", "Alcremie-Mint-Cream", "Alcremie-Lemon-Cream", "Alcremie-Salted-Cream", "Alcremie-Ruby-Swirl", "Alcremie-Caramel-Swirl", "Alcremie-Rainbow-Swirl", "Alcremie-Gmax"],
+		formeOrder: ["Alcremie", "Alcremie-Ruby-Cream", "Alcremie-Matcha-Cream", "Alcremie-Mint-Cream", "Alcremie-Lemon-Cream", "Alcremie-Salted-Cream", "Alcremie-Ruby-Swirl", "Alcremie-Caramel-Swirl", "Alcremie-Rainbow-Swirl"],
+		canGigantamax: "G-Max Finale",
 	},
 	alcremiegmax: {
 		num: 869,
@@ -15238,7 +15228,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "White",
 		eggGroups: ["Fairy", "Amorphous"],
-		isGigantamax: "G-Max Finale",
+		changesFrom: "Alcremie",
 	},
 	falinks: {
 		num: 870,
@@ -15409,8 +15399,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		prevo: "Cufant",
 		evoLevel: 34,
 		eggGroups: ["Field", "Mineral"],
-		otherFormes: ["Copperajah-Gmax"],
-		formeOrder: ["Copperajah", "Copperajah-Gmax"],
+		canGigantamax: "G-Max Steelsurge",
 	},
 	copperajahgmax: {
 		num: 879,
@@ -15424,7 +15413,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Green",
 		eggGroups: ["Field", "Mineral"],
-		isGigantamax: "G-Max Steelsurge",
+		changesFrom: "Copperajah",
 	},
 	dracozolt: {
 		num: 880,
@@ -15488,8 +15477,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 40,
 		color: "White",
 		eggGroups: ["Mineral", "Dragon"],
-		otherFormes: ["Duraludon-Gmax"],
-		formeOrder: ["Duraludon", "Duraludon-Gmax"],
+		canGigantamax: "G-Max Depletion",
 	},
 	duraludongmax: {
 		num: 884,
@@ -15503,7 +15491,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "White",
 		eggGroups: ["Mineral", "Dragon"],
-		isGigantamax: "G-Max Depletion",
+		changesFrom: "Duraludon",
 	},
 	dreepy: {
 		num: 885,
@@ -15557,6 +15545,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		eggGroups: ["Undiscovered"],
 		otherFormes: ["Zacian-Crowned"],
 		formeOrder: ["Zacian", "Zacian-Crowned"],
+		cannotDynamax: true,
 	},
 	zaciancrowned: {
 		num: 888,
@@ -15573,6 +15562,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		eggGroups: ["Undiscovered"],
 		requiredItem: "Rusted Sword",
 		changesFrom: "Zacian",
+		cannotDynamax: true,
 	},
 	zamazenta: {
 		num: 889,
@@ -15587,6 +15577,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		eggGroups: ["Undiscovered"],
 		otherFormes: ["Zamazenta-Crowned"],
 		formeOrder: ["Zamazenta", "Zamazenta-Crowned"],
+		cannotDynamax: true,
 	},
 	zamazentacrowned: {
 		num: 889,
@@ -15603,6 +15594,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		eggGroups: ["Undiscovered"],
 		requiredItem: "Rusted Shield",
 		changesFrom: "Zamazenta",
+		cannotDynamax: true,
 	},
 	eternatus: {
 		num: 890,
@@ -15617,6 +15609,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		eggGroups: ["Undiscovered"],
 		otherFormes: ["Eternatus-Eternamax"],
 		formeOrder: ["Eternatus", "Eternatus-Eternamax"],
+		cannotDynamax: true,
 	},
 	eternatuseternamax: {
 		num: 890,
@@ -15631,6 +15624,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Purple",
 		eggGroups: ["Undiscovered"],
+		cannotDynamax: true,
 	},
 	kubfu: {
 		num: 891,
@@ -15660,8 +15654,9 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "other",
 		evoCondition: "Defeat the Single Strike Tower",
 		eggGroups: ["Undiscovered"],
-		otherFormes: ["Urshifu-Rapid-Strike", "Urshifu-Gmax", "Urshifu-Rapid-Strike-Gmax"],
-		formeOrder: ["Urshifu", "Urshifu-Gmax", "Urshifu-Rapid-Strike", "Urshifu-Rapid-Strike-Gmax"],
+		otherFormes: ["Urshifu-Rapid-Strike"],
+		formeOrder: ["Urshifu", "Urshifu-Rapid-Strike"],
+		canGigantamax: "G-Max One Blow",
 	},
 	urshifurapidstrike: {
 		num: 892,
@@ -15679,6 +15674,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		evoType: "other",
 		evoCondition: "Defeat the Rapid Strike Tower",
 		eggGroups: ["Undiscovered"],
+		canGigantamax: "G-Max Rapid Flow",
 	},
 	urshifugmax: {
 		num: 892,
@@ -15693,7 +15689,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 0,
 		color: "Gray",
 		eggGroups: ["Undiscovered"],
-		isGigantamax: "G-Max One Blow",
+		changesFrom: "Urshifu",
 	},
 	urshifurapidstrikegmax: {
 		num: 892,
@@ -15708,8 +15704,8 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		weightkg: 105,
 		color: "Gray",
 		eggGroups: ["Undiscovered"],
-		isGigantamax: "G-Max Rapid Flow",
 		battleOnly: "Urshifu-Rapid-Strike",
+		changesFrom: "Urshifu-Rapid-Strike",
 	},
 	zarude: {
 		num: 893,
@@ -15933,7 +15929,7 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 	kitsunoh: {
 		num: -14,
 		name: "Kitsunoh",
-		types: ["Steel", "Ghost"],
+		types: ["Ghost", "Steel"],
 		baseStats: {hp: 80, atk: 103, def: 85, spa: 55, spd: 80, spe: 110},
 		abilities: {0: "Frisk", 1: "Limber", H: "Iron Fist"},
 		heightm: 1.1,
@@ -16497,18 +16493,47 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		eggGroups: ["Water 1", "Fairy"],
 		gen: 7,
 	},
+	justyke: {
+		num: -54,
+		name: "Justyke",
+		types: ["Steel", "Ground"],
+		gender: "N",
+		baseStats: {hp: 72, atk: 70, def: 56, spa: 83, spd: 68, spe: 30},
+		abilities: {0: "Levitate", 1: "Stalwart", H: "Justified"},
+		heightm: 0.4,
+		weightkg: 36.5,
+		color: "Brown",
+		evos: ["Equilibra"],
+		eggGroups: ["Mineral"],
+		gen: 7,
+	},
 	equilibra: {
 		num: -55,
 		name: "Equilibra",
 		types: ["Steel", "Ground"],
 		gender: "N",
-		baseStats: {hp: 102, atk: 50, def: 96, spa: 133, spd: 118, spe: 60},
-		abilities: {0: "Levitate", 1: "Bulletproof", H: "Justified"},
+		baseStats: {hp: 102, atk: 50, def: 96, spa: 121, spd: 118, spe: 60},
+		abilities: {0: "Levitate", 1: "Stalwart", H: "Justified"},
 		heightm: 0.8,
 		weightkg: 51.3,
 		color: "Brown",
+		prevo: "Justyke",
+		evoLevel: 32,
 		eggGroups: ["Mineral"],
 		gen: 7,
+	},
+	solotl: {
+		num: -56,
+		name: "Solotl",
+		types: ["Fire", "Dragon"],
+		baseStats: {hp: 68, atk: 48, def: 34, spa: 72, spd: 24, spe: 84},
+		abilities: {0: "Regenerator", 1: "Vital Spirit", H: "Magician"},
+		heightm: 0.6,
+		weightkg: 11.8,
+		color: "Red",
+		evos: ["Astrolotl"],
+		eggGroups: ["Dragon", "Fairy"],
+		gen: 8,
 	},
 	astrolotl: {
 		num: -57,
@@ -16519,7 +16544,21 @@ export const BattlePokedex: {[speciesid: string]: SpeciesData} = {
 		heightm: 1.9,
 		weightkg: 50,
 		color: "Red",
+		prevo: "Solotl",
+		evoLevel: 36,
 		eggGroups: ["Dragon", "Fairy"],
+		gen: 8,
+	},
+	miasmaw: {
+		num: -59,
+		name: "Miasmaw",
+		types: ["Bug", "Dragon"],
+		baseStats: {hp: 85, atk: 135, def: 60, spa: 115, spd: 85, spe: 89},
+		abilities: {0: "Neutralizing Gas", H: "Compound Eyes"},
+		heightm: 1.2,
+		weightkg: 57,
+		color: "Green",
+		eggGroups: ["Bug", "Dragon"],
 		gen: 8,
 	},
 	// NOTE: PokeStar "formes" are not actually formes and thus do not have a formeOrder

@@ -1,7 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 type Battle = import('./battle').Battle;
 type BattleQueue = import('./battle-queue').BattleQueue;
 type Field = import('./field').Field;
 type Action = import('./battle-queue').Action;
+type MoveAction = import('./battle-queue').MoveAction;
 type ActionChoice = import('./battle-queue').ActionChoice;
 type ModdedDex = import('./dex').ModdedDex;
 type Pokemon = import('./pokemon').Pokemon;
@@ -25,7 +28,7 @@ type SparseStatsTable = Partial<StatsTable>;
 type BoostName = StatNameExceptHP | 'accuracy' | 'evasion';
 type BoostsTable = {[boost in BoostName]: number };
 type SparseBoostsTable = Partial<BoostsTable>;
-type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Custom';
+type Nonstandard = 'Past' | 'Future' | 'Unobtainable' | 'CAP' | 'LGPE' | 'Custom' | 'Gigantamax';
 /**
  * Describes the acceptable target(s) of a move.
  * adjacentAlly - Only relevant to Doubles or Triples, the move only targets an ally of the user.
@@ -63,6 +66,7 @@ interface PokemonSet {
 	happiness?: number;
 	pokeball?: string;
 	hpType?: string;
+	gigantamax?: boolean;
 }
 
 /**
@@ -89,6 +93,13 @@ interface PokemonSet {
  */
 type MoveSource = string;
 
+namespace TierTypes {
+	export type Singles = "AG" | "Uber" | "(Uber)" | "OU" | "(OU)" | "UUBL" | "UU" | "RUBL" | "RU" | "NUBL" | "NU" |
+	"(NU)" | "PUBL" | "PU" | "(PU)" | "NFE" | "LC Uber" | "LC";
+	export type Doubles = "DUber" | "(DUber)" | "DOU" | "(DOU)" | "DBL" | "DUU" | "(DUU)" | "NFE" | "LC Uber" | "LC";
+	export type Other = "Unreleased" | "Illegal" | "CAP" | "CAP NFE" | "CAP LC";
+}
+
 interface EventInfo {
 	generation: number;
 	level?: number;
@@ -107,7 +118,7 @@ interface EventInfo {
 	from?: string;
 }
 
-type Effect = Ability | Item | ActiveMove | Species | PureEffect | Format;
+type Effect = Ability | Item | ActiveMove | Species | Condition | Format;
 
 interface CommonHandlers {
 	ModifierEffect: (this: Battle, relayVar: number, target: Pokemon, source: Pokemon, effect: Effect) => number | void;
@@ -174,7 +185,7 @@ interface MoveEventMethods {
 	onHit?: CommonHandlers['ResultMove'];
 	onHitField?: CommonHandlers['ResultMove'];
 	onHitSide?: (this: Battle, side: Side, source: Pokemon, move: ActiveMove) => boolean | null | "" | void;
-	onModifyMove?: (this: Battle, move: ActiveMove, pokemon: Pokemon, target: Pokemon) => void;
+	onModifyMove?: (this: Battle, move: ActiveMove, pokemon: Pokemon, target: Pokemon | null) => void;
 	onModifyPriority?: CommonHandlers['ModifierSourceMove'];
 	onMoveFail?: CommonHandlers['VoidMove'];
 	onModifyType?: (this: Battle, move: ActiveMove, pokemon: Pokemon, target: Pokemon) => void;
@@ -188,7 +199,7 @@ interface MoveEventMethods {
 	onUseMoveMessage?: CommonHandlers['VoidSourceMove'];
 }
 
-interface PureEffectEventMethods {
+interface ConditionEventMethods {
 	durationCallback?: (this: Battle, target: Pokemon, source: Pokemon, effect: Effect | null) => number;
 	onCopy?: (this: Battle, pokemon: Pokemon) => void;
 	onEnd?: (this: Battle, target: Pokemon & Side & Field) => void;
@@ -201,7 +212,7 @@ interface EventMethods {
 	onEmergencyExit?: (this: Battle, pokemon: Pokemon) => void;
 	onAfterEachBoost?: (this: Battle, boost: SparseBoostsTable, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onAfterHit?: MoveEventMethods['onAfterHit'];
-	onAfterSetStatus?: (this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect) => void;
+	onAfterSetStatus?: (this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onAfterSubDamage?: MoveEventMethods['onAfterSubDamage'];
 	onAfterSwitchInSelf?: (this: Battle, pokemon: Pokemon) => void;
 	onAfterUseItem?: (this: Battle, item: Item, pokemon: Pokemon) => void;
@@ -265,9 +276,9 @@ interface EventMethods {
 	onResidual?: (this: Battle, target: Pokemon & Side, source: Pokemon, effect: Effect) => void;
 	onSetAbility?: (this: Battle, ability: string, target: Pokemon, source: Pokemon, effect: Effect) => boolean | void;
 	onSetStatus?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect
 	) => boolean | null | void;
-	onSetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => boolean | void;
+	onSetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => boolean | void;
 	onStallMove?: (this: Battle, pokemon: Pokemon) => boolean | void;
 	onSwitchIn?: (this: Battle, pokemon: Pokemon) => void;
 	onSwitchOut?: (this: Battle, pokemon: Pokemon) => void;
@@ -276,11 +287,11 @@ interface EventMethods {
 		(this: Battle, item: Item, pokemon: Pokemon, source: Pokemon, move?: ActiveMove) => boolean | void
 	) | boolean;
 	onTerrain?: (this: Battle, pokemon: Pokemon) => void;
-	onTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: PureEffect) => void;
-	onWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => void;
+	onTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: Condition) => void;
+	onWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => void;
 	onTrapPokemon?: (this: Battle, pokemon: Pokemon) => void;
 	onTryAddVolatile?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, sourceEffect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, sourceEffect: Effect
 	) => boolean | null | void;
 	onTryEatItem?: boolean | ((this: Battle, item: Item, pokemon: Pokemon) => boolean | void);
 	/* FIXME: onTryHeal() is run with two different sets of arguments */
@@ -296,14 +307,14 @@ interface EventMethods {
 	onTryPrimaryHit?: (this: Battle, target: Pokemon, source: Pokemon, move: ActiveMove) => boolean | null | number | void;
 	onType?: (this: Battle, types: string[], pokemon: Pokemon) => string[] | void;
 	onUpdate?: (this: Battle, pokemon: Pokemon) => void;
-	onWeather?: (this: Battle, target: Pokemon, source: null, effect: PureEffect) => void;
+	onWeather?: (this: Battle, target: Pokemon, source: null, effect: Condition) => void;
 	onWeatherModifyDamage?: CommonHandlers['ModifierSourceMove'];
 	onModifyDamagePhase1?: CommonHandlers['ModifierSourceMove'];
 	onModifyDamagePhase2?: CommonHandlers['ModifierSourceMove'];
 	onAllyDamagingHit?: (this: Battle, damage: number, target: Pokemon, source: Pokemon, move: ActiveMove) => void;
 	onAllyAfterEachBoost?: (this: Battle, boost: SparseBoostsTable, target: Pokemon, source: Pokemon) => void;
 	onAllyAfterHit?: MoveEventMethods['onAfterHit'];
-	onAllyAfterSetStatus?: (this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect) => void;
+	onAllyAfterSetStatus?: (this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onAllyAfterSubDamage?: MoveEventMethods['onAfterSubDamage'];
 	onAllyAfterSwitchInSelf?: (this: Battle, pokemon: Pokemon) => void;
 	onAllyAfterUseItem?: (this: Battle, item: Item, pokemon: Pokemon) => void;
@@ -366,9 +377,9 @@ interface EventMethods {
 	onAllyResidual?: (this: Battle, target: Pokemon & Side, source: Pokemon, effect: Effect) => void;
 	onAllySetAbility?: (this: Battle, ability: string, target: Pokemon, source: Pokemon, effect: Effect) => boolean | void;
 	onAllySetStatus?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect
 	) => boolean | null | void;
-	onAllySetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => boolean | void;
+	onAllySetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => boolean | void;
 	onAllyStallMove?: (this: Battle, pokemon: Pokemon) => boolean | void;
 	onAllySwitchIn?: (this: Battle, pokemon: Pokemon) => void;
 	onAllySwitchOut?: (this: Battle, pokemon: Pokemon) => void;
@@ -376,11 +387,11 @@ interface EventMethods {
 		(this: Battle, item: Item, pokemon: Pokemon, source: Pokemon, move?: ActiveMove) => boolean | void
 	) | boolean;
 	onAllyTerrain?: (this: Battle, pokemon: Pokemon) => void;
-	onAllyTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: PureEffect) => void;
-	onAllyWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => void;
+	onAllyTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: Condition) => void;
+	onAllyWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => void;
 	onAllyTrapPokemon?: (this: Battle, pokemon: Pokemon) => void;
 	onAllyTryAddVolatile?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, sourceEffect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, sourceEffect: Effect
 	) => boolean | null | void;
 	onAllyTryEatItem?: boolean | ((this: Battle, item: Item, pokemon: Pokemon) => boolean | void);
 	/* FIXME: onAllyTryHeal() is run with two different sets of arguments */
@@ -398,14 +409,14 @@ interface EventMethods {
 	) => boolean | null | number | void;
 	onAllyType?: (this: Battle, types: string[], pokemon: Pokemon) => string[] | void;
 	onAllyUpdate?: (this: Battle, pokemon: Pokemon) => void;
-	onAllyWeather?: (this: Battle, target: Pokemon, source: null, effect: PureEffect) => void;
+	onAllyWeather?: (this: Battle, target: Pokemon, source: null, effect: Condition) => void;
 	onAllyWeatherModifyDamage?: CommonHandlers['ModifierSourceMove'];
 	onAllyModifyDamagePhase1?: CommonHandlers['ModifierSourceMove'];
 	onAllyModifyDamagePhase2?: CommonHandlers['ModifierSourceMove'];
 	onFoeDamagingHit?: (this: Battle, damage: number, target: Pokemon, source: Pokemon, move: ActiveMove) => void;
 	onFoeAfterEachBoost?: (this: Battle, boost: SparseBoostsTable, target: Pokemon, source: Pokemon) => void;
 	onFoeAfterHit?: MoveEventMethods['onAfterHit'];
-	onFoeAfterSetStatus?: (this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect) => void;
+	onFoeAfterSetStatus?: (this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onFoeAfterSubDamage?: MoveEventMethods['onAfterSubDamage'];
 	onFoeAfterSwitchInSelf?: (this: Battle, pokemon: Pokemon) => void;
 	onFoeAfterUseItem?: (this: Battle, item: Item, pokemon: Pokemon) => void;
@@ -468,9 +479,9 @@ interface EventMethods {
 	onFoeResidual?: (this: Battle, target: Pokemon & Side, source: Pokemon, effect: Effect) => void;
 	onFoeSetAbility?: (this: Battle, ability: string, target: Pokemon, source: Pokemon, effect: Effect) => boolean | void;
 	onFoeSetStatus?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect
 	) => boolean | null | void;
-	onFoeSetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => boolean | void;
+	onFoeSetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => boolean | void;
 	onFoeStallMove?: (this: Battle, pokemon: Pokemon) => boolean | void;
 	onFoeSwitchIn?: (this: Battle, pokemon: Pokemon) => void;
 	onFoeSwitchOut?: (this: Battle, pokemon: Pokemon) => void;
@@ -478,11 +489,11 @@ interface EventMethods {
 		(this: Battle, item: Item, pokemon: Pokemon, source: Pokemon, move?: ActiveMove) => boolean | void
 	) | boolean;
 	onFoeTerrain?: (this: Battle, pokemon: Pokemon) => void;
-	onFoeTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: PureEffect) => void;
-	onFoeWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => void;
+	onFoeTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: Condition) => void;
+	onFoeWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => void;
 	onFoeTrapPokemon?: (this: Battle, pokemon: Pokemon) => void;
 	onFoeTryAddVolatile?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, sourceEffect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, sourceEffect: Effect
 	) => boolean | null | void;
 	onFoeTryEatItem?: boolean | ((this: Battle, item: Item, pokemon: Pokemon) => boolean | void);
 	/* FIXME: onFoeTryHeal() is run with two different sets of arguments */
@@ -500,14 +511,14 @@ interface EventMethods {
 	) => boolean | null | number | void;
 	onFoeType?: (this: Battle, types: string[], pokemon: Pokemon) => string[] | void;
 	onFoeUpdate?: (this: Battle, pokemon: Pokemon) => void;
-	onFoeWeather?: (this: Battle, target: Pokemon, source: null, effect: PureEffect) => void;
+	onFoeWeather?: (this: Battle, target: Pokemon, source: null, effect: Condition) => void;
 	onFoeWeatherModifyDamage?: CommonHandlers['ModifierSourceMove'];
 	onFoeModifyDamagePhase1?: CommonHandlers['ModifierSourceMove'];
 	onFoeModifyDamagePhase2?: CommonHandlers['ModifierSourceMove'];
 	onSourceDamagingHit?: (this: Battle, damage: number, target: Pokemon, source: Pokemon, move: ActiveMove) => void;
 	onSourceAfterEachBoost?: (this: Battle, boost: SparseBoostsTable, target: Pokemon, source: Pokemon) => void;
 	onSourceAfterHit?: MoveEventMethods['onAfterHit'];
-	onSourceAfterSetStatus?: (this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect) => void;
+	onSourceAfterSetStatus?: (this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onSourceAfterSubDamage?: MoveEventMethods['onAfterSubDamage'];
 	onSourceAfterSwitchInSelf?: (this: Battle, pokemon: Pokemon) => void;
 	onSourceAfterUseItem?: (this: Battle, item: Item, pokemon: Pokemon) => void;
@@ -572,9 +583,9 @@ interface EventMethods {
 		this: Battle, ability: string, target: Pokemon, source: Pokemon, effect: Effect
 	) => boolean | void;
 	onSourceSetStatus?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect
 	) => boolean | null | void;
-	onSourceSetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => boolean | void;
+	onSourceSetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => boolean | void;
 	onSourceStallMove?: (this: Battle, pokemon: Pokemon) => boolean | void;
 	onSourceSwitchIn?: (this: Battle, pokemon: Pokemon) => void;
 	onSourceSwitchOut?: (this: Battle, pokemon: Pokemon) => void;
@@ -582,11 +593,11 @@ interface EventMethods {
 		(this: Battle, item: Item, pokemon: Pokemon, source: Pokemon, move?: ActiveMove) => boolean | void
 	) | boolean;
 	onSourceTerrain?: (this: Battle, pokemon: Pokemon) => void;
-	onSourceTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: PureEffect) => void;
-	onSourceWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => void;
+	onSourceTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: Condition) => void;
+	onSourceWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => void;
 	onSourceTrapPokemon?: (this: Battle, pokemon: Pokemon) => void;
 	onSourceTryAddVolatile?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, sourceEffect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, sourceEffect: Effect
 	) => boolean | null | void;
 	onSourceTryEatItem?: boolean | ((this: Battle, item: Item, pokemon: Pokemon) => boolean | void);
 	/* FIXME: onSourceTryHeal() is run with two different sets of arguments */
@@ -604,14 +615,14 @@ interface EventMethods {
 	) => boolean | null | number | void;
 	onSourceType?: (this: Battle, types: string[], pokemon: Pokemon) => string[] | void;
 	onSourceUpdate?: (this: Battle, pokemon: Pokemon) => void;
-	onSourceWeather?: (this: Battle, target: Pokemon, source: null, effect: PureEffect) => void;
+	onSourceWeather?: (this: Battle, target: Pokemon, source: null, effect: Condition) => void;
 	onSourceWeatherModifyDamage?: CommonHandlers['ModifierSourceMove'];
 	onSourceModifyDamagePhase1?: CommonHandlers['ModifierSourceMove'];
 	onSourceModifyDamagePhase2?: CommonHandlers['ModifierSourceMove'];
 	onAnyDamagingHit?: (this: Battle, damage: number, target: Pokemon, source: Pokemon, move: ActiveMove) => void;
 	onAnyAfterEachBoost?: (this: Battle, boost: SparseBoostsTable, target: Pokemon, source: Pokemon) => void;
 	onAnyAfterHit?: MoveEventMethods['onAfterHit'];
-	onAnyAfterSetStatus?: (this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect) => void;
+	onAnyAfterSetStatus?: (this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect) => void;
 	onAnyAfterSubDamage?: MoveEventMethods['onAfterSubDamage'];
 	onAnyAfterSwitchInSelf?: (this: Battle, pokemon: Pokemon) => void;
 	onAnyAfterUseItem?: (this: Battle, item: Item, pokemon: Pokemon) => void;
@@ -674,9 +685,9 @@ interface EventMethods {
 	onAnyResidual?: (this: Battle, target: Pokemon & Side, source: Pokemon, effect: Effect) => void;
 	onAnySetAbility?: (this: Battle, ability: string, target: Pokemon, source: Pokemon, effect: Effect) => boolean | void;
 	onAnySetStatus?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, effect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, effect: Effect
 	) => boolean | null | void;
-	onAnySetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => boolean | void;
+	onAnySetWeather?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => boolean | void;
 	onAnyStallMove?: (this: Battle, pokemon: Pokemon) => boolean | void;
 	onAnySwitchIn?: (this: Battle, pokemon: Pokemon) => void;
 	onAnySwitchOut?: (this: Battle, pokemon: Pokemon) => void;
@@ -684,11 +695,11 @@ interface EventMethods {
 		(this: Battle, item: Item, pokemon: Pokemon, source: Pokemon, move?: ActiveMove) => boolean | void
 	) | boolean;
 	onAnyTerrain?: (this: Battle, pokemon: Pokemon) => void;
-	onAnyTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: PureEffect) => void;
-	onAnyWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: PureEffect) => void;
+	onAnyTerrainStart?: (this: Battle, target: Pokemon, source: Pokemon, terrain: Condition) => void;
+	onAnyWeatherStart?: (this: Battle, target: Pokemon, source: Pokemon, weather: Condition) => void;
 	onAnyTrapPokemon?: (this: Battle, pokemon: Pokemon) => void;
 	onAnyTryAddVolatile?: (
-		this: Battle, status: PureEffect, target: Pokemon, source: Pokemon, sourceEffect: Effect
+		this: Battle, status: Condition, target: Pokemon, source: Pokemon, sourceEffect: Effect
 	) => boolean | null | void;
 	onAnyTryEatItem?: boolean | ((this: Battle, item: Item, pokemon: Pokemon) => boolean | void);
 	/* FIXME: onAnyTryHeal() is run with two different sets of arguments */
@@ -706,7 +717,7 @@ interface EventMethods {
 	) => boolean | null | number | void;
 	onAnyType?: (this: Battle, types: string[], pokemon: Pokemon) => string[] | void;
 	onAnyUpdate?: (this: Battle, pokemon: Pokemon) => void;
-	onAnyWeather?: (this: Battle, target: Pokemon, source: null, effect: PureEffect) => void;
+	onAnyWeather?: (this: Battle, target: Pokemon, source: null, effect: Condition) => void;
 	onAnyWeatherModifyDamage?: CommonHandlers['ModifierSourceMove'];
 	onAnyModifyDamagePhase1?: CommonHandlers['ModifierSourceMove'];
 	onAnyModifyDamagePhase2?: CommonHandlers['ModifierSourceMove'];
@@ -722,6 +733,8 @@ interface EventMethods {
 	onAnyFaintPriority?: number;
 	onAllyBasePowerPriority?: number;
 	onAllyModifyAtkPriority?: number;
+	onAllyModifySpAPriority?: number;
+	onAllyModifySpDPriority?: number;
 	onAttractPriority?: number;
 	onBasePowerPriority?: number;
 	onBeforeMovePriority?: number;
@@ -753,10 +766,12 @@ interface EventMethods {
 	onResidualSubOrder?: number;
 	onSourceBasePowerPriority?: number;
 	onSourceInvulnerabilityPriority?: number;
+	onSourceModifyAccuracyPriority?: number;
 	onSourceModifyAtkPriority?: number;
 	onSourceModifySpAPriority?: number;
 	onSwitchInPriority?: number;
 	onTrapPokemonPriority?: number;
+	onTryEatItemPriority?: number;
 	onTryHealPriority?: number;
 	onTryHitPriority?: number;
 	onTryMovePriority?: number;
@@ -778,7 +793,7 @@ interface EffectData {
 type ModdedEffectData = EffectData | Partial<EffectData> & {inherit: true};
 
 type EffectType =
-	'Effect' | 'Pokemon' | 'Move' | 'Item' | 'Ability' | 'Format' |
+	'Condition' | 'Pokemon' | 'Move' | 'Item' | 'Ability' | 'Format' |
 	'Ruleset' | 'Weather' | 'Status' | 'Rule' | 'ValidatorRule';
 
 interface BasicEffect extends EffectData {
@@ -791,23 +806,23 @@ interface BasicEffect extends EffectData {
 	toString: () => string;
 }
 
-interface PureEffectData extends EffectData, PureEffectEventMethods, EventMethods {
+interface ConditionData extends EffectData, ConditionEventMethods, EventMethods {
 	noCopy?: boolean;
 	affectsFainted?: boolean;
 	counterMax?: number;
 }
 
-type ModdedPureEffectData = PureEffectData | Partial<PureEffectData> & {inherit: true};
+type ModdedConditionData = ConditionData | Partial<ConditionData> & {inherit: true};
 
-interface PureEffect extends Readonly<BasicEffect & PureEffectData> {
-	readonly effectType: 'Status' | 'Effect' | 'Weather';
+interface Condition extends Readonly<BasicEffect & ConditionData> {
+	readonly effectType: 'Status' | 'Condition' | 'Weather';
 }
 
 interface AbilityData extends EffectData, AbilityEventMethods, EventMethods {
 	name: string;
 	/** internal index number */
 	num?: number;
-	effect?: Partial<PureEffectData>;
+	condition?: Partial<ConditionData>;
 	rating?: number;
 	isUnbreakable?: boolean;
 	suppressWeather?: boolean;
@@ -831,7 +846,7 @@ interface ItemData extends EffectData, ItemEventMethods, EventMethods {
 	name: string;
 	/** just controls location on the item spritesheet */
 	num?: number;
-	effect?: Partial<PureEffectData>;
+	condition?: Partial<ConditionData>;
 	gen: number;
 	fling?: FlingData;
 	forcedForme?: string;
@@ -902,7 +917,7 @@ interface MoveData extends EffectData, MoveEventMethods, HitEffect {
 	name: string;
 	/** move index number, used for Metronome rolls */
 	num?: number;
-	effect?: Partial<PureEffectData>;
+	condition?: Partial<ConditionData>;
 	basePower: number;
 	accuracy: true | number;
 	pp: number;
@@ -1126,7 +1141,8 @@ interface SpeciesData {
 	requiredItems?: string[];
 	requiredMove?: string;
 	battleOnly?: string | string[];
-	isGigantamax?: string;
+	canGigantamax?: string;
+	cannotDynamax?: boolean;
 	changesFrom?: string;
 	maleOnlyHidden?: boolean;
 	unreleasedHidden?: boolean | 'Past';
@@ -1136,15 +1152,17 @@ type ModdedSpeciesData = SpeciesData | Partial<Omit<SpeciesData, 'name'>> & {inh
 
 interface SpeciesFormatsData {
 	comboMoves?: readonly string[];
-	doublesTier?: string;
+	doublesTier?: TierTypes.Doubles | TierTypes.Other;
 	essentialMove?: string;
 	exclusiveMoves?: readonly string[];
+	gmaxUnreleased?: boolean;
 	isNonstandard?: Nonstandard | null;
 	randomBattleMoves?: readonly string[];
 	randomBattleLevel?: number;
 	randomDoubleBattleMoves?: readonly string[];
+	randomDoubleBattleLevel?: number;
 	randomSets?: readonly RandomTeamsTypes.Gen2RandomSet[];
-	tier?: string;
+	tier?: TierTypes.Singles | TierTypes.Other;
 }
 
 type ModdedSpeciesFormatsData = SpeciesFormatsData & {inherit?: true};
@@ -1176,7 +1194,7 @@ interface GameTimerSettings {
 	accelerate: boolean;
 }
 
-interface FormatsData extends EventMethods {
+interface FormatData extends EventMethods {
 	name: string;
 
 	banlist?: string[];
@@ -1199,7 +1217,7 @@ interface FormatsData extends EventMethods {
 	onModifyMovePriority?: number;
 	onModifyTypePriority?: number;
 	onSwitchInPriority?: number;
-	rated?: boolean;
+	rated?: boolean | string;
 	minSourceGen?: number;
 	restricted?: string[];
 	ruleset?: string[];
@@ -1213,6 +1231,7 @@ interface FormatsData extends EventMethods {
 	checkLearnset?: (
 		this: TeamValidator, move: Move, species: Species, setSources: PokemonSources, set: PokemonSet
 	) => {type: string, [any: string]: any} | null;
+	getEvoFamily?: (this: Format, speciesid: string) => ID;
 	getSharedPower?: (this: Format, pokemon: Pokemon) => Set<string>;
 	onAfterMega?: (this: Battle, pokemon: Pokemon) => void;
 	onBegin?: (this: Battle) => void;
@@ -1237,9 +1256,10 @@ interface FormatsData extends EventMethods {
 	column?: number;
 }
 
-type ModdedFormatsData = FormatsData | Omit<FormatsData, 'name'> & {inherit: true};
+type FormatList = (FormatData | {section: string, column?: number})[];
+type ModdedFormatData = FormatData | Omit<FormatData, 'name'> & {inherit: true};
 
-interface Format extends Readonly<BasicEffect & FormatsData> {
+interface Format extends Readonly<BasicEffect & FormatData> {
 	readonly effectType: 'Format' | 'Ruleset' | 'Rule' | 'ValidatorRule';
 	readonly baseRuleset: string[];
 	readonly banlist: string[];
@@ -1247,6 +1267,7 @@ interface Format extends Readonly<BasicEffect & FormatsData> {
 	readonly defaultLevel: number;
 	readonly maxLevel: number;
 	readonly noLog: boolean;
+	readonly restricted: string[];
 	readonly ruleset: string[];
 	readonly unbanlist: string[];
 	ruleTable: import('./dex-data').RuleTable | null;
@@ -1364,10 +1385,11 @@ interface ModdedBattlePokemon {
 	) => string | false;
 	transformInto?: (this: Pokemon, pokemon: Pokemon, effect: Effect | null) => boolean;
 	setStatus?: (
-		this: Pokemon, status: string | PureEffect, source: Pokemon | null,
+		this: Pokemon, status: string | Condition, source: Pokemon | null,
 		sourceEffect: Effect | null, ignoreImmunities: boolean
 	) => boolean;
 	ignoringAbility?: (this: Pokemon) => boolean;
+	ignoringItem?: (this: Pokemon) => boolean;
 
 	// OM
 	getLinkedMoves?: (this: Pokemon, ignoreDisabled?: boolean) => string[];
@@ -1463,6 +1485,7 @@ namespace RandomTeamsTypes {
 		stickyWeb?: number;
 		rapidSpin?: number;
 		defog?: number;
+		screens?: number;
 		illusion?: number;
 		statusCure?: number;
 	}
@@ -1491,6 +1514,7 @@ namespace RandomTeamsTypes {
 		shiny: boolean;
 		nature?: string;
 		happiness?: number;
+		gigantamax?: boolean;
 		moveset?: RandomTeamsTypes.RandomSet;
 		other?: {discard: boolean, restrictMoves: {[k: string]: number}};
 	}
