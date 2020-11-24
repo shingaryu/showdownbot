@@ -297,9 +297,18 @@ class Minimax {
     
         var maxNode = this.playerTurn(battle, maxDepth, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, choices);
         if(!maxNode.action) return randombot.decide(battle, choices);
-        logger.info("My action: " + maxNode.action.type + " " + maxNode.action.id);
-        if(this.overallMinNode.action)
-            logger.info("Predicted opponent action: " + this.overallMinNode.action.type + " " + this.overallMinNode.action.id);
+        if (battle.p1.request.wait) {
+            logger.info("My action: (wait)");
+            logger.info("Predicted opponent action: " + Util.toChoiceString(maxNode.action));   
+        } else if (battle.p2.request.wait) {
+            logger.info("My action: " + Util.toChoiceString(maxNode.action));
+            logger.info("Predicted opponent action: (wait)");    
+        } else {
+            logger.info("My action: " + Util.toChoiceString(maxNode.action));
+            if(this.overallMinNode.action) {
+                logger.info("Predicted opponent action: " + this.overallMinNode.action.type + " " + this.overallMinNode.action.id);
+            }
+        }
         this.lastMove = maxNode.action.id;
         var endTime = new Date();
         logger.info("Decision took: " + (endTime - startTime) / 1000 + " seconds");
