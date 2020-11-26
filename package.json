@@ -8,7 +8,7 @@
     "convnetjs": "^0.3.0",
     "express": "^4.10.0",
     "jsclass": "4.x",
-    "log4js": "1.1.1",
+    "log4js": "^6.3.0",
     "moment": "^2.25.1",
     "nedb": "^1.8.0",
     "nunjucks": "3.x",

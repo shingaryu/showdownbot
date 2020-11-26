@@ -24,7 +24,7 @@ var util = require('./util');
 var fs = require('fs');
 
 // Setup Logging
-require('./initLog4js')(global.program.nolog, global.program.onlyinfo);
+require('./configure-logger')(global.program.onlyinfo ? 'info': 'all', !global.program.nolog);
 var logger = require('log4js').getLogger("bot");
 
 // Login information for this bot

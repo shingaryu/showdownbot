@@ -17,7 +17,7 @@ if (isChildProcess) {
 	global.team6g = JSON.parse(process.argv[5]);
 	global.team7g = JSON.parse(process.argv[6]);
 	global.team8g = JSON.parse(process.argv[7]);
-	require('./initLog4js')(global.program.nolog, global.program.onlyinfo);
+	require('./configure-logger')(global.program.onlyinfo ? 'info': 'all', !global.program.nolog);
 } 
 
 const BattleRoom = require('./battleroom');

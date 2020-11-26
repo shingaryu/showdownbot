@@ -4,5 +4,5 @@ module.exports.TeamValidator = require('./showdown-sources/.sim-dist/team-valida
 module.exports.PcmBattle = require('./percymon-battle-engine').PcmBattle;
 module.exports.Minimax = require('./bots/minimaxbot').Minimax;
 module.exports.Util = require('./util');
-module.exports.initLog4js = require('./initLog4js');
+module.exports.configureLogger = require('./configure-logger');
 module.exports.TeamImporter = require('./team-importer').TeamImporter;
