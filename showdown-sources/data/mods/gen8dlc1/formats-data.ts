@@ -407,6 +407,22 @@ export const FormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		isNonstandard: "Unobtainable",
 		tier: "Unreleased",
 	},
+	genesectburn: {
+		isNonstandard: "Unobtainable",
+		tier: "Unreleased",
+	},
+	genesectchill: {
+		isNonstandard: "Unobtainable",
+		tier: "Unreleased",
+	},
+	genesectdouse: {
+		isNonstandard: "Unobtainable",
+		tier: "Unreleased",
+	},
+	genesectshock: {
+		isNonstandard: "Unobtainable",
+		tier: "Unreleased",
+	},
 	tyrunt: {
 		isNonstandard: "Unobtainable",
 		tier: "Unreleased",
@@ -515,6 +531,10 @@ export const FormatsData: {[k: string]: ModdedSpeciesFormatsData} = {
 		gmaxUnreleased: true,
 	},
 	melmetalgmax: {
+		isNonstandard: "Unobtainable",
+		tier: "Unreleased",
+	},
+	zarudedada: {
 		isNonstandard: "Unobtainable",
 		tier: "Unreleased",
 	},

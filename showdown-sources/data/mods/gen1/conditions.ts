@@ -8,7 +8,7 @@
  * under certain conditions and re-applied under other conditions.
  */
 
-export const Conditions: {[k: string]: ModdedConditionData} = {
+export const Conditions: {[id: string]: ModdedConditionData} = {
 	brn: {
 		name: 'brn',
 		effectType: 'Status',
@@ -177,7 +177,7 @@ export const Conditions: {[k: string]: ModdedConditionData} = {
 		name: 'trapped',
 		noCopy: true,
 		onTrapPokemon(pokemon) {
-			if (!this.effectData.source || !this.effectData.source.isActive) {
+			if (!this.effectData.source?.isActive) {
 				delete pokemon.volatiles['trapped'];
 				return;
 			}

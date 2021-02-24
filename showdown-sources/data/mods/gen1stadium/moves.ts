@@ -7,9 +7,59 @@ export const Moves: {[k: string]: ModdedMoveData} = {
 		inherit: true,
 		// FIXME: onBeforeMove() {},
 	},
+	counter: {
+		inherit: true,
+		ignoreImmunity: true,
+		willCrit: false,
+		basePower: 1,
+		damageCallback(pokemon, target) {
+			// Counter mechanics in Stadium 1:
+			// - a move is Counterable if it is Normal or Fighting type, has nonzero Base Power, and is not Counter
+			// - Counter succeeds if the target used a Counterable move earlier this turn
+
+			const lastMoveThisTurn = target.side.lastMove && target.side.lastMove.id === target.side.lastSelectedMove &&
+				!this.queue.willMove(target) && this.dex.getMove(target.side.lastMove.id);
+			if (!lastMoveThisTurn) {
+				this.debug("Stadium 1 Counter: last move was not this turn");
+				this.add('-fail', pokemon);
+				return false;
+			}
+
+			const lastMoveThisTurnIsCounterable = lastMoveThisTurn && lastMoveThisTurn.basePower > 0 &&
+				['Normal', 'Fighting'].includes(lastMoveThisTurn.type) && lastMoveThisTurn.id !== 'counter';
+			if (!lastMoveThisTurnIsCounterable) {
+				this.debug(`Stadium 1 Counter: last move ${lastMoveThisTurn.name} was not Counterable`);
+				this.add('-fail', pokemon);
+				return false;
+			}
+			if (this.lastDamage <= 0) {
+				this.debug("Stadium 1 Counter: no previous damage exists");
+				this.add('-fail', pokemon);
+				return false;
+			}
+
+			return 2 * this.lastDamage;
+		},
+	},
 	firespin: {
 		inherit: true,
 		// FIXME: onBeforeMove() {},
+	},
+	haze: {
+		inherit: true,
+		onHit(target, source) {
+			this.add('-clearallboost');
+			for (const pokemon of this.getAllActive()) {
+				pokemon.clearBoosts();
+				// This should cure the status of both Pokemon, and subsequently recalculate stats to remove the Paralysis/Burn Speed Drop.
+				pokemon.cureStatus();
+				for (const id of Object.keys(pokemon.volatiles)) {
+					pokemon.removeVolatile(id);
+					this.add('-end', pokemon, id);
+				}
+				pokemon.recalculateStats!();
+			}
+		},
 	},
 	highjumpkick: {
 		inherit: true,
@@ -55,6 +105,13 @@ export const Moves: {[k: string]: ModdedMoveData} = {
 			},
 		},
 	},
+	psywave: {
+		inherit: true,
+		basePower: 1,
+		damageCallback(pokemon) {
+			return this.random(1, this.trunc(1.5 * pokemon.level));
+		},
+	},
 	rage: {
 		inherit: true,
 		self: {
@@ -98,6 +155,7 @@ export const Moves: {[k: string]: ModdedMoveData} = {
 			if (!target.setStatus('slp', source, move)) return false;
 			target.statusData.time = 2;
 			target.statusData.startTime = 2;
+			target.recalculateStats!(); // Stadium Rest removes statdrops given by Major Status Conditions.
 			this.heal(target.maxhp); // Aesthetic only as the healing happens after you fall asleep in-game
 		},
 	},
