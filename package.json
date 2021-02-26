@@ -24,7 +24,7 @@
     "fast": "npm run build && node bot.js --usechildprocess --onlyinfo",
     "tsc": "tsc",
     "build": "cd ./showdown-sources && node build",
-    "prepack": "npm run build"
+    "prepare": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^8.10.36",
